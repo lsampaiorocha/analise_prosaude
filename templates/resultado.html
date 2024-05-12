@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Resultado</title>
+    <style>
+        body {
+            text-align: center; /* Centraliza o texto no corpo da página */
+            font-size: 15px; /* Define o tamanho da fonte para o corpo todo */
+        }
+        form {
+            display: inline-block; /* Permite que a centralização afete o formulário */
+        }
+        select {
+            width: 200px;
+            height: 150px;
+            margin-bottom: 10px;
+        }
+        .pre-formatted {
+            white-space: pre-wrap; /* Mantém espaçamento mas quebra a linha conforme necessário */
+            word-wrap: break-word; /* Quebra palavras longas se necessário */
+            overflow-wrap: break-word; /* Assegura que as palavras não ultrapassem a largura do container */
+            max-width: 95%; /* Define a largura máxima para 95% do container pai */
+            margin: auto; /* Centraliza o <pre> horizontalmente */
+            background-color: #f4f4f4; /* Fundo cinza para destacar o texto */
+            padding: 10px; /* Adiciona um padding para melhorar a legibilidade */
+            border-radius: 8px; /* Bordas arredondadas para estética */
+            border: 1px solid #ccc; /* Borda sutil */
+        }
+    </style>
+</head>
+<body>
+    <h1>Resultado</h1>
+    <pre class="pre-formatted">{{ resposta }}</pre>
+    <BR>
+    <a href="/">Voltar</a>
+</body>
+</html>

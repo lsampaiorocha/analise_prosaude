@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Análise de Medicamentos</title>
+    <style>
+        body {
+            text-align: center; /* Centraliza o texto no corpo da página */
+            font-size: 15px; /* Define o tamanho da fonte para o corpo todo */
+        }
+        form {
+            display: inline-block; /* Permite que a centralização afete o formulário */
+        }
+        textarea {
+            width: 300px; /* Largura maior para caber mais texto */
+            height: 185px; /* Altura adequada para multilinhas */
+            margin-bottom: 10px;
+        }
+        .pre-formatted {
+            white-space: pre-wrap; /* Mantém espaçamento mas quebra a linha conforme necessário */
+            word-wrap: break-word; /* Quebra palavras longas se necessário */
+            overflow-wrap: break-word; /* Assegura que as palavras não ultrapassem a largura do container */
+            max-width: 95%; /* Define a largura máxima para 95% do container pai */
+            margin: auto; /* Centraliza o <pre> horizontalmente */
+            background-color: #f4f4f4; /* Fundo cinza para destacar o texto */
+            padding: 10px; /* Adiciona um padding para melhorar a legibilidade */
+            border-radius: 8px; /* Bordas arredondadas para estética */
+            border: 1px solid #ccc; /* Borda sutil */
+        }
+        #resultado {
+            display: none;
+        }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
+<body>
+    <h1>Análise de Medicamentos</h1>
+    <form id="medication-form">
+        <label for="medications">Digite uma lista de nomes dos medicamentos e dosagens (opcional), separados por vírgula:</label><br><br>
+        <textarea id="medications" name="medications" placeholder="Ex: Denosumabe 60 mg/ml, ALOGLIPTINA  12,5MG  +  METFORMINA  1.000MG, RANIBIZUMABE" required></textarea><br><br>
+        <input type="submit" value="Analisar Medicamentos">
+    </form>
+    <div id="resultado">
+        <h1>Resultado</h1>
+        <pre class="pre-formatted">
+            <script>
+                $(document).ready(function() {
+                    $('#medication-form').on('submit', function(e) {
+                        e.preventDefault();
+                        var formData = new FormData(this);
+                        $.ajax({
+                            url: '/',
+                            type: 'POST',
+                            data: formData,
+                            success: function(data) {
+                                $('#resultado').show();
+                                $('.pre-formatted').text(data.resposta);
+                            },
+                            cache: false,
+                            contentType: false,
+                            processData: false
+                        });
+                    });
+                });
+            </script>
+        </pre>
+    </div>
+    <BR>
+    
+</body>
+</html>
