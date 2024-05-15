@@ -24,6 +24,10 @@ import fitz  # PyMuPDF
 from PIL import Image
 import io
 
+#Busca Infos
+import pandas as pd
+import re
+
 
 
 
@@ -232,7 +236,34 @@ def verifica_anvisa(m):
 #(medicamento, dose_em_mg, nome_comercial, registro_anvisa)
 #Por fazer
 def busca_info(m):
-  return m
+    
+    # Tabela de onde vão ser retiradas as infos dos medicamentos
+    tabela_precos =  pd.read_excel('tabela_precos.xls',skiprows=52)
+    
+    #Lista que retorna no final da função
+    infos_medicamentos = list()
+
+    # Laço para pegar as informações de cada medicamento na tabela pmvg
+    for medicamento, dose in m:
+        tabela_precos_2 = tabela_precos
+        tabela_precos_2['SUBSTÂNCIA'] = tabela_precos_2['SUBSTÂNCIA'].fillna('')
+        medicamento =  medicamento.split(' + ')
+        for i in medicamento:
+            padrao = re.compile(i, re.IGNORECASE)
+            tabela_precos_2 =  tabela_precos_2[tabela_precos_2['SUBSTÂNCIA'].str.contains(padrao)]
+    
+
+        if tabela_precos_2.empty:
+            infos_medicamentos.append((medicamento,dose,None,None,None))
+        else:
+            indice_maior_preco = tabela_precos_2['PMVG Sem Imposto'].idxmax()
+            preco = tabela_precos_2.loc[indice_maior_preco,'PMVG Sem Imposto']
+            dosagem  = tabela_precos_2.loc[indice_maior_preco,'APRESENTAÇÃO']
+            num_registro = tabela_precos_2.loc[indice_maior_preco,'REGISTRO']
+            nome_comercial = tabela_precos_2.loc[indice_maior_preco,'PRODUTO'] 
+            substancia = tabela_precos_2.loc[indice_maior_preco,'SUBSTÂNCIA']
+            infos_medicamentos.append((substancia,dosagem,nome_comercial,num_registro,preco))
+    return infos_medicamentos    
                 
 
 
