@@ -39,11 +39,45 @@ class Meds(BaseModel):
     meds: list[str] = Field(description="Lista de medicamentos presentes na sentença")
     
 # Define your desired data structure.
-class Outr(BaseModel):
-    outr: list[str] = Field(description="Lista de itens que não são medicamentos presentes na sentença")
+class Inter(BaseModel):
+    inter: list[str] = Field(description="Lista de itens que são consultas, exames, procedimentos clínicos e cirúrgicos")
+
+# Define your desired data structure.
+class Alim(BaseModel):
+    alim: list[str] = Field(description="Lista de compostos alimentares presentes na sentença")
+
+#Inicialização do dicionário que irá conter as respostas a serem devolvidas pela API
+def inicializa_dicionario():
+  dados = {
+    #Se houve ou não pedido de indenização por danos morais e materiais
+    "indenizacao": False,
+    #Se houve ou não condenação de honorários acima de R$1500
+    "condenacao_honorarios": None,
+    #Se os laudos dos autos são públicos ou privados
+    "laudo_publico": None,
+    #Se o valor total do tratamento é inferior a 60 salários mínimos
+    "valor_teto": None,
+    #medicamentos contidos na sentença
+    "lista_medicamentos": [],
+    #intervenções contidas na sentença: consultas, exames, procedimentos, internação em leito especializado, UTI...
+    "lista_intervencoes": [],
+    #compostos alimentares contidos na sentença
+    "lista_compostos": [],
+    #fornecimento de insulinas e insumos para aplicação e monitoramento do índice glicêmico
+    "lista_glicemico": [],
+    #fornecimento de insumos de atenção básica, como fraldas, cadeira de rodas, cama hospitalar e outros
+    "lista_insumos": [],
+    #tratamento multidisciplinar disponibilizado pelo SUS:, fisioterapia, fonoaudiologia, oxigênio domiciliar, embolização e oxigenoterapia hiperbárica...
+    "lista_tratamento": [],
+    #para cada inciso (1-6) indica se ele foi aplicado
+    "aplicacao_incisos": [False, False, False, False, False, False]  
+  }
+  return dados
 
 
-def analisar_portaria(caminho, incisos):
+#Principal função da API, recebe um caminho contendo um arquivo de sentença 
+# retorna um dicionário com todas as informações para tomada de decisão de aplicação da portaria
+def analisar_portaria(caminho):
   
   #Carrega o pdf dado pelo caminho
   loader = PyPDFLoader(caminho)
@@ -65,7 +99,6 @@ def analisar_portaria(caminho, incisos):
     "Contexto: {context}"
   )
   
-
   #prompt do chat
   prompt = ChatPromptTemplate.from_messages(
     [
@@ -74,86 +107,102 @@ def analisar_portaria(caminho, incisos):
     ]
   )
 
-  #cria uma chain de question and anwer
+  #cria uma chain de perguntas e respostas
   question_answer_chain = create_stuff_documents_chain(llm, prompt)
 
-  #cria uma chain de retrieval
+  #cria uma chain de retrieval para realizar as perguntas e respostas
   chain = create_retrieval_chain(docsearch.as_retriever(), question_answer_chain)
   
-  #saida a ser apresentada na pagina
-  r = ""
-  
-  #print(incisos)
-  
-  for i in incisos:
-    match i:
-        case "i1":
-            [m, o] = inciso1(chain)
-            
-            #Função que irá normalizar os nomes de modo a ser buscado na tabela
-            #recebe uma lista com pares (medicamento, dose_em_mg) e normaliza os nomes dos medicamentos 
-            # de acordo com o princípio ativo e separando nomes compostos por ; como na planilha do Jonas
-            m = normaliza_nomes(m)
-            
-            #Função que irá acrescentar informações sobre os medicamentos
-            #recebe uma lista com pares (medicamento, dose_em_mg) e retorna tuplas 
-            #(medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
-            m = busca_info(m)
-            
-            #se somente medicamentos
-            if m and not o:
-              if verifica_teto(m):
-                if verifica_anvisa(m):
-                  r = "\n".join([r, "Aplica-se a Portaria:", str(m)])
-                return r
-              
-              else:
-                r = "\n".join([r, "Os medicamentos violam o teto de 60 salários mínimos "])
-                return r
-                
-            #senão
-            else:
-              r = "\n".join([r, "Existem outros itens que o robô ainda não é capaz de analisar : ", str(o)])
-              return r
-        case "i2":
-            break
-        case "i3":
-            break
-        case "i4":
-            break
-        case "i5":
-            break
-        case "i6":
-            break
-        case _:
-            print("Valor fora do intervalo 1-6")
-
+  resposta = analise_geral(chain)
 
   docsearch._collection.delete(ids=ids)
-  return r
+  
+  return resposta
+
+
+#Realiza todas as tarefas de análise necessárias para obtenção das informações
+#retorna um dicionário com as informações obtidas
+def analise_geral(chain):
+    
+  #lista contendo os nomes de medicamentos obtidos da sentença
+  lm = analise_medicamentos(chain)
+  
+  #inicialização do dicionário de resposta
+  resposta = inicializa_dicionario()
+
+  #Função que irá normalizar os nomes de modo a ser buscado na tabela
+  #recebe uma lista com nomes de medicamentos, possivelmente contendo também a dosagem dos mesmos 
+  # normaliza os nomes dos medicamentos de acordo com o princípio ativo e 
+  # separando nomes compostos por ; como na planilha CMED do Jonas
+  # A saída será uma lista de tuplas (principios ativos, dose_em_mg)
+  lm = normaliza_nomes(lm)
+  
+  #Função que irá acrescentar mais informações sobre os medicamentos
+  #recebe uma lista com pares (principios ativos, dose_em_mg) padronizados como no CMED
+  # e retorna tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
+  #lm = busca_info(lm)
+  
+  
+  #Recebe uma lista com tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
+  #e verifica se respeita o limite de 60 salários mínimos
+  resposta['valor_teto'] = verifica_teto(lm)
+
+  #adiciona as informações de medicamentos obtidas
+  for meds in lm:
+    resposta['lista_medicamentos'].append({
+    "nome_principio": meds,
+    "nome_comercial": None,
+    "dosagem": None,
+    "registro_anvisa": None,
+    "oferta_SUS": None,
+    "preco_PMVG": None,
+    "preco_PMVG_max": None
+    })
+
+  
+  return resposta
+
+
+#Recebe uma retrieval chain de uma sentença e retorna uma lista de medicamentos presentes
+# pares (medicamento, dosagem_em_mg)
+def analise_indenizacao(chain, q1):
+    """
+    Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
+    
+    Danos morais referem-se a prejuízos que afetam a honra, os sentimentos, a reputação ou a dignidade de uma pessoa, causados por outra parte, que podem não resultar em perdas financeiras diretas. 
+    Danos materiais, por outro lado, são prejuízos que resultam em perda financeira tangível, como propriedade danificada ou perda de renda devido a uma ação ou negligência de outra parte.
+    
+    Sua tarefa agora é responder apenas 'Sim' ou 'Não' se houve solicitação de indenização por danos morais ou materiais. 
+    """
+    
+    # Invoca a cadeia de análise com o prompt fornecido
+    resposta = chain.invoke({"input": q1}).get('answer')
+
+    # Interpreta a resposta como 'Sim' ou 'Não' e converte para booleano
+    possui_indenizacao = True if resposta.strip().lower() == 'sim' else False
+
+    # Retorna o resultado encapsulado no modelo Pydantic
+    return possui_indenizacao
 
 
 
-#Recebe uma retrieval chain de uma sentença e retorna duas listas: 
-# lista 1 medicamentos presentes -> pares (medicamento, dosagem_em_mg)
-# lista 2 outros itens
 
-def inciso1(chain):
+#Recebe uma retrieval chain de uma sentença e retorna uma lista de medicamentos presentes
+# pares (medicamento, dosagem_em_mg)
+def analise_medicamentos(chain):
 
     lm = [] #lista de medicamentos
-    lo = [] #lista de outros itens
-
 
     #Aqui o objetivo dos prompts é listar os itens que são medicamentos
 
     q1 = """
         Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
     
-        Considere como medicamentos apenas substâncias ou compostos farmacêuticos usados exclusivamente para tratar, prevenir ou diagnosticar doenças. 
+        Considere como medicamentos apenas substâncias ou compostos farmacêuticos usados exclusivamente para tratar, prevenir ou curar doenças. 
     
         Outros itens médicos ou de assistência, como fraldas, seringas, luvas, oxímetro, leitos hospitalares ou termômetros não são medicamentos
         
-        Sua tarefa é fornecer uma lista contendo apenas os itens que são medicamentos.
+        Sua tarefa é fornecer uma lista contendo apenas os itens que são medicamentos na decisão judicial.
     """
     
     r1 = chain.invoke({"input": q1}).get('answer')
@@ -169,23 +218,33 @@ def inciso1(chain):
     chain2 = prompt | llm | parser
 
     lm = chain2.invoke({"query": r1}).get("meds") 
-    
-    
+        
+    return lm
+
+#Recebe uma retrieval chain de uma sentença e retorna uma lista de intervenções
+# pares (medicamento, dosagem_em_mg)
+def analise_intervencoes(chain):
     #Aqui o objetivo  dos prompts  é listar os itens que não são medicamentos (não está funcionando bem)
     
-    q2 = """
+    q1 = """
         Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
-    
-        Considere como medicamentos apenas substâncias ou compostos farmacêuticos usados exclusivamente para tratar, prevenir ou diagnosticar doenças. 
-    
-        Sua tarefa é fornecer uma lista contendo apenas os itens da sentença que são itens médicos ou de assistência, mas que não são medicamentos.
         
-        Por exemplo: fraldas, seringas, luvas, oxímetro, leitos hospitalares ou termômetros não são medicamentos.
+        Você deve limitar sua análise ao trecho da sentença, onde ele declara que julga procedente ou improcedente o pedido.
+        
+        Considere uma consulta médica como uma interação entre um paciente e um profissional de saúde, tipicamente um médico, para avaliação, diagnóstico e planejamento do tratamento de qualquer condição de saúde. 
+        
+        Considere como um exames médico um procedimento laboratorial ou de imagem que ajude a avaliar e diagnosticar problemas de saúde do paciente.
+        
+        Considere como procedimento clínicos ou cirúrgico uma intervenção terapêuticas para tratar doenças, lesões ou deformidades.
+        
+        Sua tarefar é identificar e extrair qualquer menção à realização de consultas, exames, e procedimentos clínicos e cirúrgicos na sentença.
+        
+        Sua resposta deve ser uma lista contendo os itens extraídos da sentença.
     """
     
-    r2 = chain.invoke({"input": q2}).get('answer')  
+    r1 = chain.invoke({"input": q1}).get('answer')  
     
-    parser = JsonOutputParser(pydantic_object=Outr)
+    parser = JsonOutputParser(pydantic_object=Inter)
 
     prompt = PromptTemplate(
         template="Forneça apenas a lista com os nomes dos itens que não são medicamentos.\n{format_instructions}\n{query}\n",
@@ -195,11 +254,45 @@ def inciso1(chain):
 
     chain3 = prompt | llm | parser
 
-    lo = chain3.invoke({"query": r2}).get("outr") 
-    
-    lo = []
+    lo = chain3.invoke({"query": r1}).get("outr") 
         
-    return [lm, lo]
+    return lo
+
+
+#Recebe uma retrieval chain de uma sentença e retorna uma lista de medicamentos presentes
+# pares (medicamento, dosagem_em_mg)
+def analise_alimentares(chain):
+
+    la = [] #lista de compostos alimentares
+
+    #Aqui o objetivo dos prompts é listar os itens que são compostos alimentares
+
+    """
+    Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
+
+    Considere como compostos alimentares apenas substâncias ou produtos alimentícios usados exclusivamente para nutrir, complementar a dieta ou fornecer benefícios à saúde, excluindo medicamentos e suplementos farmacêuticos.
+
+    Outros itens não alimentares, como fraldas, seringas, luvas, oxímetro, leitos hospitalares ou termômetros, não são compostos alimentares.
+
+    Sua tarefa é fornecer uma lista contendo apenas os itens que são compostos alimentares na decisão judicial.
+    """
+
+    
+    r1 = chain.invoke({"input": q1}).get('answer')
+
+    parser = JsonOutputParser(pydantic_object=Alim)
+
+    prompt = PromptTemplate(
+        template="Forneça apenas a lista com os nomes dos compostos alimentares.\n{format_instructions}\n{query}\n",
+        input_variables=["query"],
+        partial_variables={"format_instructions": parser.get_format_instructions()},
+    )
+
+    chain2 = prompt | llm | parser
+
+    la = chain2.invoke({"query": r1}).get("meds") 
+        
+    return la
 
 
 #Recebe como entrada uma string contendo uma lista de medicamentos e suas dosagens (em mg), separados por vírgula
@@ -213,29 +306,31 @@ def analisar_medicamentos(medicamentos):
   return medicamentos
 
 
-#recebe uma lista com pares (medicamento, dose_em_mg) e normaliza os nomes dos medicamentos de acordo com o princípio ativo
+#recebe uma lista com nomes de medicamento, contendo possivelmente também as dosagens e aplicação
+# normaliza os nomes dos medicamentos de acordo com o princípio ativo e 
+# separando nomes compostos por ; como na planilha CMED do Jonas
+# A saída será uma lista de tuplas (principios ativos, dose_em_mg)
 #Por fazer
-def normaliza_nomes(m):
-  return m
+def normaliza_nomes(lm):
+  return lm
 
 #Recebe uma lista com tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
 #e verifica se respeita o limite de 60 salários mínimos
 #Por fazer
-def verifica_teto(m):
+def verifica_teto(lm):
   return True
 
-#Recebe uma lista com tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
+#Recebe uma lista com tuplas (principio ativo, dose_em_mg, nome_comercial, registro_anvisa, valor_PMVG)
 #e verifica se todos estão registrados na anvisa
 #Por fazer
-def verifica_anvisa(m):
+def verifica_anvisa(lm):
   return True
 
 
 #Função que irá acrescentar informações sobre os medicamentos
-#recebe uma lista com pares (medicamento, dose_em_mg) e retorna tuplas 
-#(medicamento, dose_em_mg, nome_comercial, registro_anvisa)
-#Por fazer
-def busca_info(m):
+#recebe uma lista com pares (principios ativos, dose_em_mg) e retorna tuplas 
+#(principio ativo, dose_em_mg, nome_comercial, registro_anvisa, valor_PMVG)
+def busca_info(lm):
     
     # Tabela de onde vão ser retiradas as infos dos medicamentos
     tabela_precos =  pd.read_excel('tabela_precos.xls',skiprows=52)
@@ -244,7 +339,7 @@ def busca_info(m):
     infos_medicamentos = list()
 
     # Laço para pegar as informações de cada medicamento na tabela pmvg
-    for medicamento, dose in m:
+    for medicamento, dose in lm:
         tabela_precos_2 = tabela_precos
         tabela_precos_2['SUBSTÂNCIA'] = tabela_precos_2['SUBSTÂNCIA'].fillna('')
         medicamento =  medicamento.split(' + ')

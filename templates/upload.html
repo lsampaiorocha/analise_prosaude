@@ -36,15 +36,7 @@
 <body>
     <h1>Análise de Sentenças</h1>
     <form id="upload-form">
-        <label for="incisos">Selecione os incisos da Portaria 01/2017 que deseja analisar:</label><br><br>
-        <select id="incisos" name="incisos" multiple required>
-            <option value="i1">Inciso I</option>
-            <option value="i2">Inciso II</option>
-            <option value="i3">Inciso III</option>
-            <option value="i4">Inciso IV</option>
-            <option value="i5">Inciso V</option>
-            <option value="i6">Inciso VI</option>
-        </select><br><br>
+        <label for="incisos">Selecione o arquivo que deseja analisar (Portaria 01/2017):</label><br><br><br><br>
         <input type="file" name="file" required>
         <input type="submit" value="Analisar Arquivo">
     </form>
@@ -62,7 +54,7 @@
                             data: formData,
                             success: function(data) {
                                 $('#resultado').show();
-                                $('.pre-formatted').text(data.resposta);
+                                $('.pre-formatted').html(data);
                             },
                             cache: false,
                             contentType: false,
