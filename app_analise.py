@@ -39,8 +39,9 @@ def index():
         else:
             return "Nenhum arquivo enviado."
     else:
-        return render_template('upload.html')
+        return render_template('resultado.html')
 
+#Função que formata as respostas em um HTML 
 def formatar_resposta_html(resposta):
     if isinstance(resposta, dict):
         # Início da formatação HTML
@@ -48,7 +49,8 @@ def formatar_resposta_html(resposta):
         resultado_html += f"<p>Indenização por danos morais ou materiais: {'Sim' if resposta['indenizacao'] else 'Não'}</p>"
         resultado_html += f"<p>Condenação em Honorários superior a R$1500: {'Sim' if resposta['condenacao_honorarios'] else 'Não'}</p>"
         resultado_html += f"<p>Laudo Público: {'Sim' if resposta['laudo_publico'] else 'Não'}</p>"
-        resultado_html += f"<p>Respeita valor do teto: {'Sim' if resposta['valor_teto'] else 'Não'}</p>"
+        resultado_html += f"<p>Valor total do tratamento: R$ {resposta['valor_teto']}</p>"
+        resultado_html += f"<p>Respeita valor do teto: {'Sim' if resposta['respeita_valor_teto'] else 'Não'}</p>"
 
         # Formatação para medicamentos
         resultado_html += "<h3>Lista de Medicamentos - Inciso I</h3><ul>"

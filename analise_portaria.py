@@ -55,7 +55,9 @@ def inicializa_dicionario():
     "condenacao_honorarios": None,
     #Se os laudos dos autos são públicos ou privados
     "laudo_publico": None,
-    #Se o valor total do tratamento é inferior a 60 salários mínimos
+    #valor total do tratamento
+    "respeita_valor_teto": None,
+    #valor total do tratamento
     "valor_teto": None,
     #medicamentos contidos na sentença
     "lista_medicamentos": [],
@@ -145,7 +147,8 @@ def analise_geral(chain):
   
   #Recebe uma lista com tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
   #e verifica se respeita o limite de 60 salários mínimos
-  resposta['valor_teto'] = verifica_teto(lm)
+  #devolver uma tupla ()
+  (resposta['respeita_valor_teto'], resposta['valor_teto']) = analise_teto(lm)
 
   #adiciona as informações de medicamentos obtidas
   for meds in lm:
@@ -295,17 +298,6 @@ def analise_alimentares(chain):
     return la
 
 
-#Recebe como entrada uma string contendo uma lista de medicamentos e suas dosagens (em mg), separados por vírgula
-#Por fazer
-def analisar_medicamentos(medicamentos):
-  #m = medicamentos
-  #normaliza_nomes(m)
-  #verifica_teto(m):
-  #verifica_anvisa(m)
-  #verifica_sus(m)
-  return medicamentos
-
-
 #recebe uma lista com nomes de medicamento, contendo possivelmente também as dosagens e aplicação
 # normaliza os nomes dos medicamentos de acordo com o princípio ativo e 
 # separando nomes compostos por ; como na planilha CMED do Jonas
@@ -317,8 +309,8 @@ def normaliza_nomes(lm):
 #Recebe uma lista com tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
 #e verifica se respeita o limite de 60 salários mínimos
 #Por fazer
-def verifica_teto(lm):
-  return True
+def analise_teto(lm):
+  return (True, 0)
 
 #Recebe uma lista com tuplas (principio ativo, dose_em_mg, nome_comercial, registro_anvisa, valor_PMVG)
 #e verifica se todos estão registrados na anvisa

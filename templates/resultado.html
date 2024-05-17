@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Resultado</title>
+    <meta charset="UTF-8">
+    <title>Análise de Sentenças</title>
     <style>
         body {
             text-align: center; /* Centraliza o texto no corpo da página */
@@ -26,12 +27,45 @@
             border-radius: 8px; /* Bordas arredondadas para estética */
             border: 1px solid #ccc; /* Borda sutil */
         }
+        #resultado {
+            display: none;
+        }
     </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 </head>
 <body>
-    <h1>Resultado</h1>
-    <pre class="pre-formatted">{{ resposta }}</pre>
+    <h1>Análise de Sentenças</h1>
+    <form id="upload-form">
+        <label for="incisos">Selecione o arquivo que deseja analisar (Portaria 01/2017):</label><br><br><br><br>
+        <input type="file" name="file" required>
+        <input type="submit" value="Analisar Arquivo">
+    </form>
+    <div id="resultado">
+        <h1>Resultado</h1>
+        <pre class="pre-formatted">
+            <script>
+                $(document).ready(function() {
+                    $('#upload-form').on('submit', function(e) {
+                        e.preventDefault();
+                        var formData = new FormData(this);
+                        $.ajax({
+                            url: '/',
+                            type: 'POST',
+                            data: formData,
+                            success: function(data) {
+                                $('#resultado').show();
+                                $('.pre-formatted').html(data);
+                            },
+                            cache: false,
+                            contentType: false,
+                            processData: false
+                        });
+                    });
+                });
+            </script>
+        </pre>
+    </div>
     <BR>
-    <a href="/">Voltar</a>
+    
 </body>
 </html>
