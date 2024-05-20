@@ -48,6 +48,7 @@ def formatar_resposta_html(resposta):
         resultado_html = "<h3>Informações Gerais</h3>"
         resultado_html += f"<p>Indenização por danos morais ou materiais: {'Sim' if resposta['indenizacao'] else 'Não'}</p>"
         resultado_html += f"<p>Condenação em Honorários superior a R$1500: {'Sim' if resposta['condenacao_honorarios'] else 'Não'}</p>"
+        resultado_html += f"<p>Possui outros itens além de medicamentos: {'Sim' if resposta['possui_outros'] else 'Não'}</p>"
         resultado_html += f"<p>Laudo Público: {'Sim' if resposta['laudo_publico'] else 'Não'}</p>"
         resultado_html += f"<p>Valor total do tratamento: R$ {resposta['valor_teto']}</p>"
         resultado_html += f"<p>Respeita valor do teto: {'Sim' if resposta['respeita_valor_teto'] else 'Não'}</p>"

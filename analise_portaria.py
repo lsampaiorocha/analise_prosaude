@@ -53,6 +53,8 @@ def inicializa_dicionario():
     "indenizacao": False,
     #Se houve ou não condenação de honorários acima de R$1500
     "condenacao_honorarios": None,
+    #Se há outros itens além de medicamentos
+    "possui_outros": None,
     #Se os laudos dos autos são públicos ou privados
     "laudo_publico": None,
     #valor total do tratamento
@@ -77,112 +79,211 @@ def inicializa_dicionario():
   return dados
 
 
-#Principal função da API, recebe um caminho contendo um arquivo de sentença 
-# retorna um dicionário com todas as informações para tomada de decisão de aplicação da portaria
-def analisar_portaria(caminho):
+def analisar_portaria(caminho, Verbose=False):
   
-  #Carrega o pdf dado pelo caminho
-  loader = PyPDFLoader(caminho)
-  pages = loader.load_and_split()
+    #verifica se o pdf no caminho é searchable, e caso não seja, roda o ocr
+    if is_searchable(caminho):
+        #Carrega o pdf dado pelo caminho
+        loader = PyPDFLoader(caminho)
+        pages = loader.load_and_split()
+    else:
+        pages = ocr_pdf(caminho)
+    
+    if Verbose:    
+        print(f"Número de páginas lidas: {len(pages)}")
 
-  # cria ids para as páginas, o que vai ser útil para gerenciar o banco de dados de vetores
-  ids = [str(i) for i in range(1, len(pages) + 1)]
+    # Definindo palavras-chave importantes para filtrar as páginas e reduzir a quantidade de processamento necessário
+    # A palavra julgo foi escolhida porque as sentenças em todos os casos possuem algo como "julgo procedente" ou "julgo como parcialmente procedente"
+    palavras_filtro = ['julgo']
+    #filtro_regex = re.compile('|'.join([re.escape(keyword) for keyword in palavras_filtro]), re.IGNORECASE)
+    filtro_regex = re.compile('|'.join([re.escape(keyword).replace(r'\ ', r'\s+') for keyword in palavras_filtro]), re.IGNORECASE)
+    
+    # Filtrando páginas com base nas palavras-chave
+    filtered_pages = [page for page in pages if filtro_regex.search(page.page_content)]
+    
+    try:
+    
+        #garante que a primeira pagina estara presente
+        if pages[0] not in filtered_pages:
+            filtered_pages.append(pages[0])
 
-  #utiliza embeddings da OpenAI para o banco de vetores Chroma
-  embeddings = OpenAIEmbeddings()
-  docsearch = Chroma.from_documents(pages, embeddings, ids=ids)
+        #garante que a ultima pagina estara presente
+        if pages[-1] not in filtered_pages:
+            filtered_pages.append(pages[-1])
+        
+        if Verbose:    
+            print(f"Número de páginas após filtragem inicial: {len(filtered_pages)}\n")
+            for page in filtered_pages:
+                print(f"Página {page.metadata['page']}")
+                print(f"Página {page.page_content}")
   
-  
-  #prompt do robô - context vai ser preenchido pela retrieval dos documentos
-  system_prompt = (
-    "Você é um assessor jurídico analisando um documento que contém uma decisão judicial."
-    "Utilize o contexto para responder à pergunta. "
-    "Seja conciso nas respostas, entregando apenas as informações solicitadas"
-    "Contexto: {context}"
-  )
-  
-  #prompt do chat
-  prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system_prompt),
-        ("human", "{input}"),
-    ]
-  )
 
-  #cria uma chain de perguntas e respostas
-  question_answer_chain = create_stuff_documents_chain(llm, prompt)
+        # cria ids para as páginas, o que vai ser útil para gerenciar o banco de dados de vetores
+        ids = [str(i) for i in range(1, len(filtered_pages) + 1)]
 
-  #cria uma chain de retrieval para realizar as perguntas e respostas
-  chain = create_retrieval_chain(docsearch.as_retriever(), question_answer_chain)
-  
-  resposta = analise_geral(chain)
+        #utiliza embeddings da OpenAI para o banco de vetores Chroma
+        embeddings = OpenAIEmbeddings()
+        docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids)
+        
+        
+        #prompt do robô - context vai ser preenchido pela retrieval dos documentos
+        system_prompt = (
+            "Você é um assessor jurídico analisando um documento que contém uma decisão judicial."
+            "Utilize o contexto para responder às perguntas. "
+            "Utilize apenas o contexto que se referir à decisão do juiz sobre o caso, em que é utilizado expressões como: sentença, julgo procedente, dispositivo, ratifico a decisão, "
+            "Seja conciso nas respostas, entregando apenas as informações solicitadas"
+            "Contexto: {context}"
+        )
+        
 
-  docsearch._collection.delete(ids=ids)
-  
-  return resposta
+        #prompt do chat
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_prompt),
+                ("human", "{input}"),
+            ]
+        )
+
+        #cria uma chain de perguntas e respostas
+        question_answer_chain = create_stuff_documents_chain(llm, prompt)
+
+        #cria uma chain de retrieval para realizar as perguntas e respostas
+        chain = create_retrieval_chain(docsearch.as_retriever(), question_answer_chain)
+
+        resposta = analise_geral(chain, pages)
+
+        #apaga as entradas criadas no Chroma
+        docsearch._collection.delete(ids=ids)
+        
+        return resposta
+    
+    except IndexError:
+        print(f"Erro: Nenhuma entrada encontrada para {caminho.split()[-1]}. Continuando com os próximos arquivos.")
+        return ("ERROR", "ERROR")
+        
+    except Exception as e:
+        print(f"Erro ao processar o arquivo {caminho.split()[-1]}: {e}")
+        return ("ERROR", "ERROR")
 
 
 #Realiza todas as tarefas de análise necessárias para obtenção das informações
 #retorna um dicionário com as informações obtidas
-def analise_geral(chain):
+def analise_geral(chain, pages, Verbose=False):
     
-  #lista contendo os nomes de medicamentos obtidos da sentença
-  lm = analise_medicamentos(chain)
-  
-  #inicialização do dicionário de resposta
-  resposta = inicializa_dicionario()
+    #analisa se existe condenação por honorários na sentença
+    honor = analise_honorarios(chain)    
+    
+    #analisa se existe outros itens alem de medicamentos na sentença
+    outros = analise_outros(pages, Verbose)
+    
+    #lista contendo os nomes de medicamentos obtidos da sentença
+    lm = analise_medicamentos(chain)
 
-  #Função que irá normalizar os nomes de modo a ser buscado na tabela
-  #recebe uma lista com nomes de medicamentos, possivelmente contendo também a dosagem dos mesmos 
-  # normaliza os nomes dos medicamentos de acordo com o princípio ativo e 
-  # separando nomes compostos por ; como na planilha CMED do Jonas
-  # A saída será uma lista de tuplas (principios ativos, dose_em_mg)
-  lm = normaliza_nomes(lm)
-  
-  #Função que irá acrescentar mais informações sobre os medicamentos
-  #recebe uma lista com pares (principios ativos, dose_em_mg) padronizados como no CMED
-  # e retorna tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
-  #lm = busca_info(lm)
-  
-  
-  #Recebe uma lista com tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
-  #e verifica se respeita o limite de 60 salários mínimos
-  #devolver uma tupla ()
-  (resposta['respeita_valor_teto'], resposta['valor_teto']) = analise_teto(lm)
+    #inicialização do dicionário de resposta
+    resposta = inicializa_dicionario()
 
-  #adiciona as informações de medicamentos obtidas
-  for meds in lm:
-    resposta['lista_medicamentos'].append({
-    "nome_principio": meds,
-    "nome_comercial": None,
-    "dosagem": None,
-    "registro_anvisa": None,
-    "oferta_SUS": None,
-    "preco_PMVG": None,
-    "preco_PMVG_max": None
-    })
+    #Função que irá normalizar os nomes de modo a ser buscado na tabela
+    #recebe uma lista com nomes de medicamentos, possivelmente contendo também a dosagem dos mesmos 
+    # normaliza os nomes dos medicamentos de acordo com o princípio ativo e 
+    # separando nomes compostos por ; como na planilha CMED do Jonas
+    # A saída será uma lista de tuplas (principios ativos, dose_em_mg)
+    lm = normaliza_nomes(lm)
 
-  
-  return resposta
+    #Função que irá acrescentar mais informações sobre os medicamentos
+    #recebe uma lista com pares (principios ativos, dose_em_mg) padronizados como no CMED
+    # e retorna tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
+    #lm = busca_info(lm)
 
 
-#Recebe uma retrieval chain de uma sentença e retorna uma lista de medicamentos presentes
-# pares (medicamento, dosagem_em_mg)
-def analise_indenizacao(chain, q1):
-    """
+    #Recebe uma lista com tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
+    #e verifica se respeita o limite de 60 salários mínimos
+    #devolver uma tupla ()
+    (resposta['respeita_valor_teto'], resposta['valor_teto']) = analise_teto(lm)
+    
+    
+    #preenche se houve condenação por honorários e se há outros itens além de medicamentos
+    resposta['condenacao_honorarios'] = honor 
+    resposta['possui_outros'] = outros
+    
+    
+    #adiciona as informações de medicamentos obtidas
+    for meds in lm:
+        resposta['lista_medicamentos'].append({
+        "nome_principio": meds,
+        "nome_comercial": None,
+        "dosagem": None,
+        "registro_anvisa": None,
+        "oferta_SUS": None,
+        "preco_PMVG": None,
+        "preco_PMVG_max": None
+        })
+
+
+    return resposta
+
+
+#Recebe um conjunto de páginas e verifica se ocorre alguma das palavras proibitivas
+def analise_outros(pages, Verbose=False):
+    
+    #palavras que tiveram que ser retiradas: procedimento, consulta, tratamento
+    # Definindo palavras-chave importantes - OBS: Errar por excesso não é problema, o problema maior é não detectar
+    palavras_filtro = ['aliment', 'enteral', 'dieta', 'Energy','sonda','frasco','fralda', 'álcool', 'atadura', 'tubo',
+                       'gase', 'luvas', 'esparadrapo', 'algodão','cama', 'colchão', 'UTI', 'UCE', 'seringa', 'aspirador',
+                       'terapia', 'exame', 'consulta médica', 'procedimento cirúrgico', 'cirurgia', 'cadeira de roda', 
+                       'internação', 'sessão de laser', 'sessão de fisio', 'atendimento com médico',
+                       'tratamento cirúrgico', 'equipo', 'suplementação alimentar', 'compostos alimentares',
+                       'sensor de glicose', 'insulina', 'fonoaudiólogo', 'fisioterapia', 'CPAP', 
+                       'aparelho', 'BIPAP', 'umidificador', 'mascara', 'psicopedagógico', 'psicólogo', 'psiquiatr']
+    
+    
+    # Aplicando a função de normalização para lidar com acentos e assegurar espaço em branco no início
+    regex_patterns = [r'\b' + normalize_regex(re.escape(keyword)).replace(r'\ ', r'\s+') + r'\b' for keyword in palavras_filtro]
+    filtro_regex = re.compile('|'.join(regex_patterns), re.IGNORECASE)
+    
+    # Filtrando páginas com base nas palavras-chave
+    filtered_pages = [page for page in pages if filtro_regex.search(page.page_content)]
+    
+    #necessário para apresentar onde foram identificados os padrões e que padrões foram identificados
+    if Verbose:
+        if len(filtered_pages) > 1:
+            # Estrutura para capturar trechos correspondentes
+            filtered_pages_with_matches = [
+            (page, [match.group(0) for match in filtro_regex.finditer(page.page_content)])
+            for page in pages
+            if filtro_regex.search(page.page_content)
+            ]
+            # Agora filtered_pages_with_matches contém tuplas de página e lista de todos os trechos correspondentes
+            for page, matches in filtered_pages_with_matches:
+                print(f"Na página {page.metadata['page']}: Correspondências encontradas - {matches}")
+    
+    
+    # Interpreta a resposta como 'Sim' ou 'Não' e converte para booleano
+    possui_outros = True if len(filtered_pages) > 1 else False
+
+    # Retorna o resultado encapsulado no modelo Pydantic
+    return possui_outros
+
+#Recebe uma retrieval chain de uma sentença e retorna Sim ou não se houve condenação do estado do ceará ao pagamento de honorários
+def analise_honorarios(chain):
+      
+    q1 = """
     Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
+
+    Seu objetivo é verificar se o Estado do Ceará foi condenado ao pagamento de honorários advocatícios, também chamados de honorários sucumbenciais. 
     
-    Danos morais referem-se a prejuízos que afetam a honra, os sentimentos, a reputação ou a dignidade de uma pessoa, causados por outra parte, que podem não resultar em perdas financeiras diretas. 
-    Danos materiais, por outro lado, são prejuízos que resultam em perda financeira tangível, como propriedade danificada ou perda de renda devido a uma ação ou negligência de outra parte.
+    Considere que a condenação de honorários sucumbenciais em uma sentença de uma ação refere-se à obrigação imposta pela justiça ao partido perdedor de uma ação judicial de pagar os honorários advocatícios do advogado da parte vencedora.
     
-    Sua tarefa agora é responder apenas 'Sim' ou 'Não' se houve solicitação de indenização por danos morais ou materiais. 
+    As condenações podem variar em forma e valor, por vezes fixados em percentual sobre o valor da causa, em valores absolutos ou determinados por equidade.
+
+    Revise o documento e responda apenas 'Sim' ou 'Não', especificando se houve uma condenação do Estado do Ceará ao pagamento de honorários advocatícios, com base em exemplos como os seguintes:
+
     """
-    
+
     # Invoca a cadeia de análise com o prompt fornecido
     resposta = chain.invoke({"input": q1}).get('answer')
 
     # Interpreta a resposta como 'Sim' ou 'Não' e converte para booleano
-    possui_indenizacao = True if resposta.strip().lower() == 'sim' else False
+    possui_indenizacao = True if resposta.strip().lower().startswith('sim') else False
 
     # Retorna o resultado encapsulado no modelo Pydantic
     return possui_indenizacao
@@ -304,19 +405,19 @@ def analise_alimentares(chain):
 # A saída será uma lista de tuplas (principios ativos, dose_em_mg)
 #Por fazer
 def normaliza_nomes(lm):
-  return lm
+    return lm
 
 #Recebe uma lista com tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
 #e verifica se respeita o limite de 60 salários mínimos
 #Por fazer
 def analise_teto(lm):
-  return (True, 0)
+    return (True, 0)
 
 #Recebe uma lista com tuplas (principio ativo, dose_em_mg, nome_comercial, registro_anvisa, valor_PMVG)
 #e verifica se todos estão registrados na anvisa
 #Por fazer
 def verifica_anvisa(lm):
-  return True
+    return True
 
 
 #Função que irá acrescentar informações sobre os medicamentos
@@ -364,24 +465,43 @@ def is_searchable(caminho):
         text = page.get_text().strip()
         if not text:
             searchable = False
-            break  # Se qualquer página tiver texto, considera o documento como pesquisável
+            break  # Se qualquer página não tiver texto, considera o documento como não pesquisável
         
     doc.close()
     return searchable
 
-#Extrai texto de um PDF usando OCR em cada página.
+#Extrai texto de um PDF usando OCR em cada página e gerando uma lista de Documents.
 def ocr_pdf(caminho):
     doc = fitz.open(caminho)
-    texto = []
+    
+    #vai armazenar cada página extraída
+    pages = []
 
+    num_page  = 0
     for page in doc:
         # Extrai a imagem da página
         pix = page.get_pixmap()
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
         # Aplica OCR na imagem usando pytesseract
-        page_text = pytesseract.image_to_string(img)
-        texto.append(page_text)
+        page_text = pytesseract.image_to_string(img, lang='por').encode('utf-8').decode('utf-8')
+        
+        #adiciona a página usando a classe Document
+        pages.append(Document(page_content=page_text, metadata={"page": num_page, "source": caminho}))
+        
+        num_page += 1
 
     doc.close()
-    return all_text
+    return pages
+
+# Criando uma função para substituir letras acentuadas por regex que aceita ambas as formas
+def normalize_regex(keyword):
+    replacements = {
+        'á': '[aá]', 'é': '[eé]', 'í': '[ií]', 'ó': '[oó]', 'ú': '[uú]',
+        'â': '[aâ]', 'ê': '[eê]', 'î': '[iî]', 'ô': '[oô]', 'û': '[uû]',
+        'ã': '[aã]', 'õ': '[oõ]',
+        'ç': '[cç]'
+    }
+    for accented, regex in replacements.items():
+        keyword = re.sub(accented, regex, keyword)
+    return keyword
