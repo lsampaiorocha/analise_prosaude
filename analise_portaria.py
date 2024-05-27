@@ -7,6 +7,7 @@ from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts import PromptTemplate
+from langchain_core.documents import Document
 
 
 #organizar outputs
@@ -24,19 +25,36 @@ import fitz  # PyMuPDF
 from PIL import Image
 import io
 
-#Busca Infos
-import pandas as pd
-import re
+#importa as funções de análise
+from robo_consultas import *
+
+import xlrd
 
 
+# Define o caminho base como o diretório atual onde o script está sendo executado
+base_directory = os.getcwd()
 
+# Configuração da chave da API GPT
+env_path = os.path.join(base_directory, 'ambiente.env')
+load_dotenv(env_path)  # Carrega as variáveis de ambiente de .env
 
-llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.2)
+#verifica se a chave do GPT foi encontrada
+api_key = os.environ.get('OPENAI_API_KEY')
+if not api_key:
+    raise RuntimeError("OPENAI_API_KEY não está definida")
+
+llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
 embeddings = OpenAIEmbeddings()
 
 # Define your desired data structure.
-class Meds(BaseModel):
-    meds: list[str] = Field(description="Lista de medicamentos presentes na sentença")
+#class Meds(BaseModel):
+#    meds: list[str] = Field(description="Lista de medicamentos presentes na sentença")
+class Medicamento(BaseModel):
+    nome: str = Field(default="N/A",description="Nome do medicamento")
+    dose: int = Field(default=0,description="Dose do medicamento em miligramas")
+
+class Medicamentos(BaseModel):
+    meds: list[Medicamento] = Field(description="Lista de medicamentos com suas respectivas doses")
     
 # Define your desired data structure.
 class Inter(BaseModel):
@@ -63,6 +81,8 @@ def inicializa_dicionario():
     "valor_teto": None,
     #medicamentos contidos na sentença
     "lista_medicamentos": [],
+    #itens que não são medicamentos contidos na sentença...
+    "lista_outros": [],
     #intervenções contidas na sentença: consultas, exames, procedimentos, internação em leito especializado, UTI...
     "lista_intervencoes": [],
     #compostos alimentares contidos na sentença
@@ -79,7 +99,42 @@ def inicializa_dicionario():
   return dados
 
 
-def analisar_portaria(caminho, Verbose=False):
+#Função para exibição de uma resposta na saída padrão
+def exibe_dados(dados):
+    print("Resumo da Decisão Judicial:\n")
+    print(f"Pedido de Indenização por Danos: {'Sim' if dados['indenizacao'] else 'Não'}")
+    print(f"Condenação de Honorários (acima de R$1500): {'Sim' if dados['condenacao_honorarios'] else 'Não'}")
+    print(f"Outros Itens Além de Medicamentos: {'Sim' if dados['possui_outros'] else 'Não'}")
+    print(f"Status dos Laudos: {'Públicos' if dados['laudo_publico'] else 'Privados'}")
+    print(f"Respeita Valor Teto: {'Sim' if dados['respeita_valor_teto'] else 'Não'}")
+    print(f"Valor Teto: R${dados['valor_teto'] if dados['valor_teto'] is not None else 'Não especificado'}")
+    
+    # Listas
+    print("Medicamentos na Sentença:")
+    if dados['lista_medicamentos']:
+        for medicamento in dados['lista_medicamentos']:
+            print(f"  - {medicamento}")
+    else:
+        print("  Nenhum")
+        
+    print("Outros itens na Sentença:")
+    if dados['lista_outros']:
+        for outro in dados['lista_outros']:
+            print(f"  - {outro}")
+    else:
+        print("  Nenhuma")
+    
+    # Aplicação dos incisos
+    print("Aplicação dos Incisos:")
+    for i, aplicado in enumerate(dados['aplicacao_incisos'], start=1):
+        print(f"  Inciso {i}: {'Aplicado' if aplicado else 'Não Aplicado'}")
+
+
+#Função principal da API, que recebe o caminho de um arquivo contendo uma sentença ou petição inicial
+#e retorna um dicionário com todas informações relacionadas à aplicação da portaria 01/2017
+#MedRobot controla se o robô de consultas no google e anvisa será utilizado (há uma maior demora)
+#Decisao indica se trata-se de sentença ou decisão, ou se trata-se da petição inicial
+def portaria_prosaude(caminho, Verbose=False, MedRobot=True, Decisao=True):
   
     #verifica se o pdf no caminho é searchable, e caso não seja, roda o ocr
     if is_searchable(caminho):
@@ -90,19 +145,23 @@ def analisar_portaria(caminho, Verbose=False):
         pages = ocr_pdf(caminho)
     
     if Verbose:    
-        print(f"Número de páginas lidas: {len(pages)}")
+        print(f"Número de páginas lidas do arquivo: {len(pages)}")
+    
+    if Decisao:
+        # Lista de palavras-chave que deseja filtrar - esta palavra tem sido suficiente para encontrar a página da sentença ou decisão
+        palavras_filtro = ['julgo']
 
-    # Definindo palavras-chave importantes para filtrar as páginas e reduzir a quantidade de processamento necessário
-    # A palavra julgo foi escolhida porque as sentenças em todos os casos possuem algo como "julgo procedente" ou "julgo como parcialmente procedente"
-    palavras_filtro = ['julgo']
-    #filtro_regex = re.compile('|'.join([re.escape(keyword) for keyword in palavras_filtro]), re.IGNORECASE)
-    filtro_regex = re.compile('|'.join([re.escape(keyword).replace(r'\ ', r'\s+') for keyword in palavras_filtro]), re.IGNORECASE)
-    
-    # Filtrando páginas com base nas palavras-chave
-    filtered_pages = [page for page in pages if filtro_regex.search(page.page_content)]
-    
-    try:
-    
+        # Construindo a expressão regular para filtrar apenas as páginas que contém a sentença ou decisão
+        # Usamos \b para garantir que estamos capturando palavras inteiras
+        filtro_regex = re.compile(r'\b' + r'\b|\b'.join([re.escape(keyword) for keyword in palavras_filtro]) + r'\b', re.IGNORECASE)
+        
+        # Filtrando páginas com base nas palavras-chave
+        filtered_pages = [page for page in pages if filtro_regex.search(page.page_content)]
+        
+        if Verbose:
+            print(f"Número de páginas da decisão ou sentença filtradas por regex: {len(filtered_pages)}")
+            print(f"Páginas da decisão ou sentença filtradas por regex: {filtered_pages}")
+            
         #garante que a primeira pagina estara presente
         if pages[0] not in filtered_pages:
             filtered_pages.append(pages[0])
@@ -110,12 +169,30 @@ def analisar_portaria(caminho, Verbose=False):
         #garante que a ultima pagina estara presente
         if pages[-1] not in filtered_pages:
             filtered_pages.append(pages[-1])
+            
+    else:
+        # Lista de palavras-chave que deseja filtrar - esta palavra tem sido suficiente para encontrar a página da sentença ou decisão
+        palavras_filtro = ['do pedido','dos pedidos', 'pedidos e requerimentos', 'síntese fática']
+
+        # Construindo a expressão regular para filtrar apenas as páginas que contém a sentença ou decisão
+        # Usamos \b para garantir que estamos capturando palavras inteiras
+        filtro_regex = re.compile(r'\b' + r'\b|\b'.join([re.escape(keyword) for keyword in palavras_filtro]) + r'\b', re.IGNORECASE)
         
+        # Filtrando páginas com base nas palavras-chave
+        filtered_pages = [page for page in pages if filtro_regex.search(page.page_content)]
+        
+        if Verbose:
+            print(f"Número de páginas da inicial filtradas por regex: {len(filtered_pages)}")
+            print(f"Páginas da inicial filtradas por regex: {filtered_pages}")
+    try:
+    
+        
+
         if Verbose:    
             print(f"Número de páginas após filtragem inicial: {len(filtered_pages)}\n")
             for page in filtered_pages:
                 print(f"Página {page.metadata['page']}")
-                print(f"Página {page.page_content}")
+                #print(f"Página {page.page_content}")
   
 
         # cria ids para as páginas, o que vai ser útil para gerenciar o banco de dados de vetores
@@ -123,9 +200,9 @@ def analisar_portaria(caminho, Verbose=False):
 
         #utiliza embeddings da OpenAI para o banco de vetores Chroma
         embeddings = OpenAIEmbeddings()
-        docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids)
-        
-        
+        docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024})
+        #db = Chroma.from_documents(docs, embedding_model, persist_directory="./chroma_db_instance",collection_metadata={"hnsw:M": 1024,"hnsw:ef": 64})
+            
         #prompt do robô - context vai ser preenchido pela retrieval dos documentos
         system_prompt = (
             "Você é um assessor jurídico analisando um documento que contém uma decisão judicial."
@@ -150,7 +227,8 @@ def analisar_portaria(caminho, Verbose=False):
         #cria uma chain de retrieval para realizar as perguntas e respostas
         chain = create_retrieval_chain(docsearch.as_retriever(), question_answer_chain)
 
-        resposta = analise_geral(chain, pages)
+        #aplica o pipeline de análise
+        resposta = analise_pipeline(chain, filtered_pages, Verbose, MedRobot)
 
         #apaga as entradas criadas no Chroma
         docsearch._collection.delete(ids=ids)
@@ -158,43 +236,49 @@ def analisar_portaria(caminho, Verbose=False):
         return resposta
     
     except IndexError:
-        print(f"Erro: Nenhuma entrada encontrada para {caminho.split()[-1]}. Continuando com os próximos arquivos.")
-        return ("ERROR", "ERROR")
+        print(f"Erro: Você tentou acessar um índice inválido ao analisar o arquivo {caminho.split()[-1]}.")
+        return None
         
     except Exception as e:
         print(f"Erro ao processar o arquivo {caminho.split()[-1]}: {e}")
-        return ("ERROR", "ERROR")
+        return None
 
 
 #Realiza todas as tarefas de análise necessárias para obtenção das informações
 #retorna um dicionário com as informações obtidas
-def analise_geral(chain, pages, Verbose=False):
+def analise_pipeline(chain, pages, Verbose=False, MedRobot=True):
     
     #analisa se existe condenação por honorários na sentença
     honor = analise_honorarios(chain)    
     
     #analisa se existe outros itens alem de medicamentos na sentença
-    outros = analise_outros(pages, Verbose)
+    (outros, matches) = analise_outros(pages, Verbose)
     
     #lista contendo os nomes de medicamentos obtidos da sentença
-    lm = analise_medicamentos(chain)
+    lm = analise_medicamentos(chain, Verbose)
+
+    lm_busca = []
+    lm_final = []
+
+    if MedRobot == True:
+        lm_busca = busca_medicamento(lm)
+        lm_final = busca_CMED(lm_busca,lm)
+    #caso não se esteja utilizando o robô, não será possível coletar as informações sobre os medicamentos
+    elif lm:
+        for med in lm:
+            lm_busca.append((None, None, None, None, None, None,None))
+            lm_final.append((None, None, None, None))
+    #caso não hajam medicamentos, as listas serão vazias
+    else:
+        lm_busca = []
+        lm_final = []
+
+    #de toda forma faz a busca no CMED
+    
 
     #inicialização do dicionário de resposta
     resposta = inicializa_dicionario()
-
-    #Função que irá normalizar os nomes de modo a ser buscado na tabela
-    #recebe uma lista com nomes de medicamentos, possivelmente contendo também a dosagem dos mesmos 
-    # normaliza os nomes dos medicamentos de acordo com o princípio ativo e 
-    # separando nomes compostos por ; como na planilha CMED do Jonas
-    # A saída será uma lista de tuplas (principios ativos, dose_em_mg)
-    lm = normaliza_nomes(lm)
-
-    #Função que irá acrescentar mais informações sobre os medicamentos
-    #recebe uma lista com pares (principios ativos, dose_em_mg) padronizados como no CMED
-    # e retorna tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
-    #lm = busca_info(lm)
-
-
+    
     #Recebe uma lista com tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
     #e verifica se respeita o limite de 60 salários mínimos
     #devolver uma tupla ()
@@ -204,21 +288,28 @@ def analise_geral(chain, pages, Verbose=False):
     #preenche se houve condenação por honorários e se há outros itens além de medicamentos
     resposta['condenacao_honorarios'] = honor 
     resposta['possui_outros'] = outros
-    
+   
+   
+    #acrescenta as palavras chave encontradas.
+    resposta['lista_outros'] = matches
     
     #adiciona as informações de medicamentos obtidas
-    for meds in lm:
+    for idx, (principio, nome_comercial, num_registro, preco) in enumerate(lm_final):
         resposta['lista_medicamentos'].append({
-        "nome_principio": meds,
-        "nome_comercial": None,
-        "dosagem": None,
-        "registro_anvisa": None,
+        "nome_extraido": lm[idx][0],
+        "nome_principio": principio,
+        "nome_comercial": nome_comercial,
+        "dosagem": lm[idx][1],
+        "registro_anvisa": num_registro,
         "oferta_SUS": None,
-        "preco_PMVG": None,
+        "preco_PMVG": preco,
         "preco_PMVG_max": None
         })
+    
 
-
+    if Verbose:
+        exibe_dados(resposta)
+    
     return resposta
 
 
@@ -243,9 +334,20 @@ def analise_outros(pages, Verbose=False):
     # Filtrando páginas com base nas palavras-chave
     filtered_pages = [page for page in pages if filtro_regex.search(page.page_content)]
     
+    # Conjunto para armazenar palavras-chave únicas encontradas
+    unique_keywords = set()
+
+    # Analisando cada página para correspondências
+    for page in pages:
+        matches = filtro_regex.findall(page.page_content)
+        if matches:
+            # Adicionando correspondências ao conjunto, que automaticamente remove duplicatas
+            unique_keywords.update([match.lower() for match in matches])  # Converte para lowercase para evitar duplicatas por case
+    
     #necessário para apresentar onde foram identificados os padrões e que padrões foram identificados
     if Verbose:
-        if len(filtered_pages) > 1:
+        if len(filtered_pages) > 0:
+            print("Correspondências encontradas na análise de Outros itens:")
             # Estrutura para capturar trechos correspondentes
             filtered_pages_with_matches = [
             (page, [match.group(0) for match in filtro_regex.finditer(page.page_content)])
@@ -258,10 +360,13 @@ def analise_outros(pages, Verbose=False):
     
     
     # Interpreta a resposta como 'Sim' ou 'Não' e converte para booleano
-    possui_outros = True if len(filtered_pages) > 1 else False
+    possui_outros = True if len(filtered_pages) > 0 else False
+    
+    if Verbose:
+        print(f"Possui outros itens: {possui_outros} Quais: {list(unique_keywords)}")
 
     # Retorna o resultado encapsulado no modelo Pydantic
-    return possui_outros
+    return (possui_outros, list(unique_keywords))
 
 #Recebe uma retrieval chain de uma sentença e retorna Sim ou não se houve condenação do estado do ceará ao pagamento de honorários
 def analise_honorarios(chain):
@@ -293,7 +398,7 @@ def analise_honorarios(chain):
 
 #Recebe uma retrieval chain de uma sentença e retorna uma lista de medicamentos presentes
 # pares (medicamento, dosagem_em_mg)
-def analise_medicamentos(chain):
+def analise_medicamentos(chain, Verbose=False):
 
     lm = [] #lista de medicamentos
 
@@ -306,24 +411,47 @@ def analise_medicamentos(chain):
     
         Outros itens médicos ou de assistência, como fraldas, seringas, luvas, oxímetro, leitos hospitalares ou termômetros não são medicamentos
         
-        Sua tarefa é fornecer uma lista contendo apenas os itens que são medicamentos na decisão judicial.
+        Sua tarefa é fornecer uma lista contendo apenas os itens que são medicamentos na decisão judicial e a dosagem em miligramas(MG).
+        
+        Em hipótese alguma forneça na lista medicamentos que não estavam na decisão. Se não houverem medicamentos, apenas responda que não há medicamentos.
     """
     
     r1 = chain.invoke({"input": q1}).get('answer')
+    
+    
+    if Verbose:
+        print(f"Medicamentos presentes na sentença: {r1}")
+    
 
-    parser = JsonOutputParser(pydantic_object=Meds)
+    parser = JsonOutputParser(pydantic_object=Medicamentos)
 
     prompt = PromptTemplate(
-        template="Forneça apenas a lista com os nomes dos medicamentos.\n{format_instructions}\n{query}\n",
+        template="Forneça apenas a lista com os nomes dos medicamentos e o valor da dosagem em miligramas (MG).\n{format_instructions}\n{query}\n",
         input_variables=["query"],
         partial_variables={"format_instructions": parser.get_format_instructions()},
     )
 
     chain2 = prompt | llm | parser
 
-    lm = chain2.invoke({"query": r1}).get("meds") 
-        
-    return lm
+    lm = chain2.invoke({"query": r1}).get("meds")
+
+    if Verbose:
+        print(f"Medicamentos extraidos da sentença: {lm}")  
+    
+    r = []
+    
+    #previne algumas situações chatas em que não é retornado no formato previsto
+    for med in lm:
+        if 'dose' not in med:
+            med['dose'] = 0 
+        if 'nome' not in med:
+            med['nome'] = ""
+        r.append((med['nome'], med['dose']))
+    
+    if Verbose:
+        print(f"Medicamentos já dentro da estrutura: {r}") 
+ 
+    return r
 
 #Recebe uma retrieval chain de uma sentença e retorna uma lista de intervenções
 # pares (medicamento, dosagem_em_mg)
