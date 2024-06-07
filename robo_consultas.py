@@ -221,7 +221,7 @@ def busca_CMED(m, lista_medicamentos):
         if tabela_precos_2.empty:
             # Pegar o primeiro elemento da lista medicamento
             primeiro_medicamento = medicamento[0] if isinstance(medicamento, list) else medicamento
-            infos_medicamentos.append((primeiro_medicamento, nom_comerc, num_reg, None))
+            infos_medicamentos.append((primeiro_medicamento, nom_comerc, num_reg, 0))
         else:
             indice_maior_preco = tabela_precos_2['PMVG Sem Imposto'].idxmax()
             preco = tabela_precos_2.loc[indice_maior_preco, 'PMVG Sem Imposto']
@@ -229,8 +229,12 @@ def busca_CMED(m, lista_medicamentos):
             num_registro = tabela_precos_2.loc[indice_maior_preco, 'REGISTRO']
             nome_comercial = tabela_precos_2.loc[indice_maior_preco, 'PRODUTO'] 
             substancia = tabela_precos_2.loc[indice_maior_preco, 'SUBSTÂNCIA']
+            #situacao especial em que não foi possível obter o preco
+            if preco == None:
+                preco = 0
             infos_medicamentos.append((substancia, nome_comercial, num_registro, preco))
-            
+        
+    
     return infos_medicamentos
 
             

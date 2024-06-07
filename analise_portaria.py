@@ -43,6 +43,7 @@ api_key = os.environ.get('OPENAI_API_KEY')
 if not api_key:
     raise RuntimeError("OPENAI_API_KEY não está definida")
 
+#llm = ChatOpenAI(model_name="gpt-4", temperature=0)
 llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
 embeddings = OpenAIEmbeddings()
 
@@ -267,7 +268,7 @@ def analise_pipeline(chain, pages, Verbose=False, MedRobot=True):
     elif lm:
         for med in lm:
             lm_busca.append((None, None, None, None, None, None,None))
-            lm_final.append((None, None, None, None))
+            lm_final.append((None, None, "000000000", 0))
     #caso não hajam medicamentos, as listas serão vazias
     else:
         lm_busca = []
@@ -275,23 +276,34 @@ def analise_pipeline(chain, pages, Verbose=False, MedRobot=True):
 
     #de toda forma faz a busca no CMED
     
+    if Verbose:
+        print(f"Lista lm_busca: {lm_busca}\n")
+        print(f"Lista lm_final: {lm_final}\n")
+    
+    #verifica se o teto está respeitado:
+    (teto, total) =  analise_teto(lm_final)
+    
+    if Verbose:
+        print(f"Respeita teto: {teto}\n")
+        print(f"Valor total: {total}\n")
 
     #inicialização do dicionário de resposta
     resposta = inicializa_dicionario()
     
-    #Recebe uma lista com tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
-    #e verifica se respeita o limite de 60 salários mínimos
-    #devolver uma tupla ()
-    (resposta['respeita_valor_teto'], resposta['valor_teto']) = analise_teto(lm)
-    
-    
     #preenche se houve condenação por honorários e se há outros itens além de medicamentos
     resposta['condenacao_honorarios'] = honor 
     resposta['possui_outros'] = outros
+    
+    
+    resposta['respeita_valor_teto'] = teto
+    resposta['valor_teto'] = "R$ {:.2f}".format(total)
    
    
     #acrescenta as palavras chave encontradas.
     resposta['lista_outros'] = matches
+    
+    if Verbose:
+        print(f"Padrões de Outros: {matches}\n")
     
     #adiciona as informações de medicamentos obtidas
     for idx, (principio, nome_comercial, num_registro, preco) in enumerate(lm_final):
@@ -302,7 +314,7 @@ def analise_pipeline(chain, pages, Verbose=False, MedRobot=True):
         "dosagem": lm[idx][1],
         "registro_anvisa": num_registro,
         "oferta_SUS": None,
-        "preco_PMVG": preco,
+        "preco_PMVG": "R$ {:.2f}".format(preco),
         "preco_PMVG_max": None
         })
     
@@ -380,7 +392,7 @@ def analise_honorarios(chain):
     
     As condenações podem variar em forma e valor, por vezes fixados em percentual sobre o valor da causa, em valores absolutos ou determinados por equidade.
 
-    Revise o documento e responda apenas 'Sim' ou 'Não', especificando se houve uma condenação do Estado do Ceará ao pagamento de honorários advocatícios, com base em exemplos como os seguintes:
+    Revise o documento e responda apenas 'Sim' ou 'Não', especificando se houve uma condenação do Estado do Ceará ao pagamento de honorários advocatícios.
 
     """
 
@@ -527,25 +539,25 @@ def analise_alimentares(chain):
     return la
 
 
-#recebe uma lista com nomes de medicamento, contendo possivelmente também as dosagens e aplicação
-# normaliza os nomes dos medicamentos de acordo com o princípio ativo e 
-# separando nomes compostos por ; como na planilha CMED do Jonas
-# A saída será uma lista de tuplas (principios ativos, dose_em_mg)
-#Por fazer
-def normaliza_nomes(lm):
-    return lm
-
 #Recebe uma lista com tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)
 #e verifica se respeita o limite de 60 salários mínimos
 #Por fazer
 def analise_teto(lm):
-    return (True, 0)
-
-#Recebe uma lista com tuplas (principio ativo, dose_em_mg, nome_comercial, registro_anvisa, valor_PMVG)
-#e verifica se todos estão registrados na anvisa
-#Por fazer
-def verifica_anvisa(lm):
-    return True
+    
+    
+    total = 0
+    res = True
+    
+    #adiciona as informações de medicamentos obtidas
+    for idx, (principio, nome_comercial, num_registro, preco) in enumerate(lm):
+        if preco != None:
+            total += 12*preco
+    
+    if total > 1640*60:
+        res = False
+        
+        
+    return (res, total)
 
 
 #Função que irá acrescentar informações sobre os medicamentos

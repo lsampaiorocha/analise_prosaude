@@ -26,6 +26,7 @@ def index():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
             resposta = portaria_prosaude(filepath, Verbose=True)  # Função que analisa o arquivo usando LLMs
+            #resposta = portaria_prosaude(filepath, Verbose=True, MedRobot=False)  # Função que analisa o arquivo usando LLMs
             resposta_html = formatar_resposta_html(resposta)
             return resposta_html
         else:
@@ -44,9 +45,9 @@ def formatar_resposta_html(resposta):
         #resultado_html += f"<p>Laudo Público: {'Sim' if resposta['laudo_publico'] else 'Não'}</p>"
         resultado_html += f"<p>Laudo Público: Não foi possível determinar.</p>"
         #resultado_html += f"<p>Valor total do tratamento: R$ {resposta['valor_teto']}</p>"
-        resultado_html += f"<p>Valor total do tratamento: Não calculado</p>"
+        resultado_html += f"<p>Valor total do tratamento: {resposta['valor_teto']}</p>"
         #resultado_html += f"<p>Respeita valor do teto: {'Sim' if resposta['respeita_valor_teto'] else 'Não'}</p>"
-        resultado_html += f"<p>Respeita valor do teto: Não foi possível determinar</p>"
+        resultado_html += f"<p>Respeita valor do teto: {'Sim' if resposta['respeita_valor_teto'] else 'Não'}</p>"
 
         # Formatação para medicamentos
         resultado_html += "<h3>Lista de Medicamentos - Inciso I</h3><ul>"
@@ -59,7 +60,7 @@ def formatar_resposta_html(resposta):
         for medicamento in resposta['lista_medicamentos']:
             resultado_html += f"<p>{medicamento['nome_principio']} ({medicamento['nome_comercial']}) </p>"
             resultado_html += f"<p>Nome extraído da sentença: {medicamento['nome_extraido']}</p>"
-            resultado_html += f"<p>Dosagem: {medicamento['dosagem']}, Registro ANVISA: {medicamento['registro_anvisa']}, Oferta SUS: {'Sim' if medicamento['oferta_SUS'] else 'Não'}, Preço PMVG: R$ {medicamento['preco_PMVG']}, Preço PMVG Máximo: R$ {medicamento['preco_PMVG_max']}</p>"
+            resultado_html += f"<p>Dose: {medicamento['dosagem']}, Registro ANVISA: {medicamento['registro_anvisa']}, Oferta SUS: {'Sim' if medicamento['oferta_SUS'] else 'Não'}, Preço PMVG: {medicamento['preco_PMVG']}</p>"
             resultado_html += f"<br>"           
         resultado_html += "</ul>"
 
@@ -120,5 +121,9 @@ def formatar_resposta_html(resposta):
         return "<p>Erro na análise da portaria.</p>"
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, use_reloader=False)
+
+#if __name__ == '__main__':
+#    app.run(debug=True)
+    
     
