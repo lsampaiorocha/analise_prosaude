@@ -95,7 +95,7 @@ def check_anvisa_registration(anvisa_number,driver):
 #retorna as informações encontradas através do google e do site da Anvisa
 #recebe como entrada uma lista de tuplas (str_busca, dosagem)
 #onde str_busca é o nome e dosagem tais e quais extraidos da sentença
-def busca_medicamento(lista_medicamentos):
+def RoboGoogleAnvisa(lista_medicamentos):
     # Inicializar o drive
     #driver = config_chrome()
     
@@ -191,7 +191,7 @@ def busca_medicamento(lista_medicamentos):
 #retorna as informações encontradas na tabela CMED
 #recebe como entrada uma lista de tuplas (str_busca, nom_comerc, principio, num_reg, num_proc, x, y)
 #onde str_busca é o nome tal qual extraido da sentença
-def busca_CMED(m, lista_medicamentos):
+def ConsultaCMED(m, lista_medicamentos):
     # Tabela de onde vão ser retiradas as informações dos medicamentos
     tabela_precos = pd.read_excel('tabela_CMED.xls', skiprows=52)
     

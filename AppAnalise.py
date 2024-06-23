@@ -3,7 +3,7 @@ from werkzeug.utils import secure_filename
 import os
 
 #importa as funções de análise
-from analise_portaria import *
+from AnalisePortaria import *
 
 
 # Define o caminho base como o diretório atual onde o script está sendo executado
@@ -25,8 +25,8 @@ def index():
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
-            resposta = portaria_prosaude(filepath, Verbose=True)  # Função que analisa o arquivo usando LLMs
-            #resposta = portaria_prosaude(filepath, Verbose=True, MedRobot=False)  # Função que analisa o arquivo usando LLMs
+            resposta = AnalisePortaria(filepath, Verbose=True)  # Função que analisa o arquivo usando o Robô e LLMs
+            #resposta = AnalisePortaria(filepath, Verbose=True, MedRobot=False) # Função que analisa o arquivo usando o Robô e LLMs
             resposta_html = formatar_resposta_html(resposta)
             return resposta_html
         else:

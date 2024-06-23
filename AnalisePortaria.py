@@ -1,0 +1,369 @@
+from langchain_openai.chat_models import ChatOpenAI
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.vectorstores import Chroma
+
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import PromptTemplate
+from langchain_core.documents import Document
+
+
+#organizar outputs
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.pydantic_v1 import BaseModel, Field
+
+
+from dotenv import load_dotenv
+
+
+#OCRIZACAO
+import pytesseract
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'  # Ajuste o caminho
+import fitz  # PyMuPDF
+from PIL import Image
+import io
+
+#importa as funções de análise dos demais módulos
+from RobosConsultasMedicamentos import *
+from AnaliseMedicamentos import *
+from AnaliseOutros import *
+from AnaliseHonorarios import *
+from AnaliseAlimentares import *
+from AnaliseConsultaExameProcedimentoInternacao import *
+
+
+# Define o caminho base como o diretório atual onde o script está sendo executado
+base_directory = os.getcwd()
+
+# Configuração da chave da API GPT
+env_path = os.path.join(base_directory, 'ambiente.env')
+load_dotenv(env_path)  # Carrega as variáveis de ambiente de .env
+
+#verifica se a chave do GPT foi encontrada
+api_key = os.environ.get('OPENAI_API_KEY')
+if not api_key:
+    raise RuntimeError("OPENAI_API_KEY não está definida")
+
+#llm = ChatOpenAI(model_name="gpt-4", temperature=0)
+llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+embeddings = OpenAIEmbeddings()
+
+#Inicialização do dicionário que irá conter as respostas a serem devolvidas pela API
+def inicializa_dicionario():
+  dados = {
+    #Se houve ou não pedido de indenização por danos morais e materiais
+    "indenizacao": False,
+    #Se houve ou não condenação de honorários acima de R$1500
+    "condenacao_honorarios": None,
+    #Se há outros itens além de medicamentos
+    "possui_outros": None,
+    #Se os laudos dos autos são públicos ou privados
+    "laudo_publico": None,
+    #valor total do tratamento
+    "respeita_valor_teto": None,
+    #valor total do tratamento
+    "valor_teto": None,
+    #medicamentos contidos na sentença
+    "lista_medicamentos": [],
+    #itens que não são medicamentos contidos na sentença...
+    "lista_outros": [],
+    #intervenções contidas na sentença: consultas, exames, procedimentos, internação em leito especializado, UTI...
+    "lista_intervencoes": [],
+    #compostos alimentares contidos na sentença
+    "lista_compostos": [],
+    #fornecimento de insulinas e insumos para aplicação e monitoramento do índice glicêmico
+    "lista_glicemico": [],
+    #fornecimento de insumos de atenção básica, como fraldas, cadeira de rodas, cama hospitalar e outros
+    "lista_insumos": [],
+    #tratamento multidisciplinar disponibilizado pelo SUS:, fisioterapia, fonoaudiologia, oxigênio domiciliar, embolização e oxigenoterapia hiperbárica...
+    "lista_tratamento": [],
+    #para cada inciso (1-6) indica se ele foi aplicado
+    "aplicacao_incisos": [False, False, False, False, False, False]  
+  }
+  return dados
+
+#Função para exibição de uma resposta na saída padrão
+def exibe_dados(dados):
+    print("Resumo da Decisão Judicial:\n")
+    print(f"Pedido de Indenização por Danos: {'Sim' if dados['indenizacao'] else 'Não'}")
+    print(f"Condenação de Honorários (acima de R$1500): {'Sim' if dados['condenacao_honorarios'] else 'Não'}")
+    print(f"Outros Itens Além de Medicamentos: {'Sim' if dados['possui_outros'] else 'Não'}")
+    print(f"Status dos Laudos: {'Públicos' if dados['laudo_publico'] else 'Privados'}")
+    print(f"Respeita Valor Teto: {'Sim' if dados['respeita_valor_teto'] else 'Não'}")
+    print(f"Valor Teto: R${dados['valor_teto'] if dados['valor_teto'] is not None else 'Não especificado'}")
+    
+    # Listas
+    print("Medicamentos na Sentença:")
+    if dados['lista_medicamentos']:
+        for medicamento in dados['lista_medicamentos']:
+            print(f"  - {medicamento}")
+    else:
+        print("  Nenhum")
+        
+    print("Outros itens na Sentença:")
+    if dados['lista_outros']:
+        for outro in dados['lista_outros']:
+            print(f"  - {outro}")
+    else:
+        print("  Nenhuma")
+    
+    # Aplicação dos incisos
+    print("Aplicação dos Incisos:")
+    for i, aplicado in enumerate(dados['aplicacao_incisos'], start=1):
+        print(f"  Inciso {i}: {True if aplicado else False}")
+
+#Função principal da API, que recebe o caminho de um arquivo contendo uma sentença ou petição inicial
+#e retorna um dicionário com todas informações relacionadas à aplicação da portaria 01/2017
+#MedRobot controla se o robô de consultas no google e anvisa será utilizado (há uma maior demora)
+#Decisao indica se trata-se de sentença ou decisão, ou se trata-se da petição inicial
+def AnalisePortaria(caminho, Verbose=False, MedRobot=True, Mode="Sentença"):
+    
+    if Verbose:
+        print("Modo verbose ativado.")    
+        if MedRobot:
+            print("MedRobot está ativado.")
+            
+    #realiza o preprocessamento das paginas do pdf
+    filtered_pages = preprocessamento(caminho, Verbose, Mode)
+  
+    try:
+        if Verbose:    
+            print(f"Número de páginas após pré-processamento: {len(filtered_pages)}\n")
+            for page in filtered_pages:
+                print(f"Página {page.metadata['page']}")
+                #print(f"Página {page.page_content}")
+
+        # cria ids para as páginas, o que vai ser útil para gerenciar o banco de dados de vetores
+        ids = [str(i) for i in range(1, len(filtered_pages) + 1)]
+
+        #utiliza embeddings da OpenAI para o banco de vetores Chroma
+        embeddings = OpenAIEmbeddings()
+        docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024})
+        #db = Chroma.from_documents(docs, embedding_model, persist_directory="./chroma_db_instance",collection_metadata={"hnsw:M": 1024,"hnsw:ef": 64})
+            
+        #prompt do robô - context vai ser preenchido pela retrieval dos documentos
+        system_prompt = (
+            "Você é um assessor jurídico analisando um documento que contém uma decisão judicial."
+            "Utilize o contexto para responder às perguntas. "
+            "Utilize apenas o contexto que se referir à decisão do juiz sobre o caso, em que é utilizado expressões como: sentença, julgo procedente, dispositivo, ratifico a decisão, "
+            "Seja conciso nas respostas, entregando apenas as informações solicitadas"
+            "Contexto: {context}"
+        )
+
+        #prompt do chat
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_prompt),
+                ("human", "{input}"),
+            ]
+        )
+
+        #cria uma chain de perguntas e respostas
+        question_answer_chain = create_stuff_documents_chain(llm, prompt)
+
+        #cria uma chain de retrieval para realizar as perguntas e respostas
+        chain = create_retrieval_chain(docsearch.as_retriever(), question_answer_chain)
+
+        #aplica o pipeline de análise
+        resposta = AnaliseMedicamentosPipeline(chain, filtered_pages, Verbose, MedRobot)
+
+        #apaga as entradas criadas no Chroma
+        docsearch._collection.delete(ids=ids)
+        
+        return resposta
+    
+    except IndexError:
+        print(f"Erro: Você tentou acessar um índice inválido ao analisar o arquivo {caminho.split()[-1]}.")
+        return None
+        
+    except Exception as e:
+        print(f"Erro ao processar o arquivo {caminho.split()[-1]}: {e}")
+        return None
+
+# Carrega o pdf, tratando a situação em que seja non-searchable
+# Pré-processa para eliminar páginas não relacionadas ao intento (sentença, petição inicial, decisão)
+def preprocessamento(caminho, Verbose=False, Mode="Sentença"):
+    
+    #verifica se o pdf no caminho é searchable, e caso não seja, roda o ocr
+    if Searchable(caminho):
+        #Carrega o pdf dado pelo caminho
+        loader = PyPDFLoader(caminho)
+        pages = loader.load_and_split()
+    else:
+        pages = ExtraiOCR(caminho)
+    
+    if Verbose:    
+        print(f"Número de páginas lidas do arquivo: {len(pages)}")
+    
+    if Mode == "Sentença" or Mode == "Decisão":
+        # Lista de palavras-chave que deseja filtrar - esta palavra tem sido suficiente para encontrar a página da sentença ou decisão
+        palavras_filtro = ['julgo']
+
+        # Construindo a expressão regular para filtrar apenas as páginas que contém a sentença ou decisão
+        # Usamos \b para garantir que estamos capturando palavras inteiras
+        filtro_regex = re.compile(r'\b' + r'\b|\b'.join([re.escape(keyword) for keyword in palavras_filtro]) + r'\b', re.IGNORECASE)
+        
+        # Filtrando páginas com base nas palavras-chave
+        filtered_pages = [page for page in pages if filtro_regex.search(page.page_content)]
+        
+        if Verbose:
+            print(f"Número de páginas da decisão ou sentença filtradas por regex: {len(filtered_pages)}")
+            print(f"Páginas da decisão ou sentença filtradas por regex: {filtered_pages}")
+            
+        #garante que a primeira pagina estara presente
+        if pages[0] not in filtered_pages:
+            filtered_pages.append(pages[0])
+
+        #garante que a ultima pagina estara presente
+        if pages[-1] not in filtered_pages:
+            filtered_pages.append(pages[-1])
+            
+    else:
+        # Lista de palavras-chave que deseja filtrar - esta palavra tem sido suficiente para encontrar a página da sentença ou decisão
+        palavras_filtro = ['do pedido','dos pedidos', 'pedidos e requerimentos', 'síntese fática']
+
+        # Construindo a expressão regular para filtrar apenas as páginas que contém a sentença ou decisão
+        # Usamos \b para garantir que estamos capturando palavras inteiras
+        filtro_regex = re.compile(r'\b' + r'\b|\b'.join([re.escape(keyword) for keyword in palavras_filtro]) + r'\b', re.IGNORECASE)
+        
+        # Filtrando páginas com base nas palavras-chave
+        filtered_pages = [page for page in pages if filtro_regex.search(page.page_content)]
+        
+        if Verbose:
+            print(f"Número de páginas da inicial filtradas por regex: {len(filtered_pages)}")
+            print(f"Páginas da inicial filtradas por regex: {filtered_pages}")
+
+    return filtered_pages
+
+#Realiza todas as tarefas de análise necessárias para obtenção das informações
+#retorna um dicionário com as informações obtidas
+def AnaliseMedicamentosPipeline(chain, pages, Verbose=False, MedRobot=True):
+    
+    #analisa se existe condenação por honorários na sentença
+    honor = AnaliseHonorarios(chain, llm, Verbose)    
+    
+    #analisa se existe outros itens alem de medicamentos na sentença
+    (outros, matches) = AnaliseOutros(pages, Verbose)
+    
+    #lista contendo os nomes de medicamentos obtidos da sentença
+    lm = AnaliseMedicamentos(chain, llm, Verbose)
+
+    lm_busca = []
+    lm_final = []
+
+    if MedRobot == True:
+        lm_busca = RoboGoogleAnvisa(lm)
+        lm_final = ConsultaCMED(lm_busca,lm)
+    #caso não se esteja utilizando o robô, não será possível coletar as informações sobre os medicamentos
+    #assim, para cada medicamento extraído iremos preencher com informações vazias
+    elif lm:
+        for med in lm:
+            lm_busca.append((None, None, None, None, None, None,None))
+            lm_final.append((None, None, "000000000", 0))
+    #caso não hajam medicamentos, as listas serão vazias
+    else:
+        lm_busca = []
+        lm_final = []
+
+    #de toda forma faz a busca no CMED
+    
+    if Verbose:
+        print(f"Lista lm_busca: {lm_busca}\n")
+        print(f"Lista lm_final: {lm_final}\n")
+    
+    #verifica se o teto está respeitado:
+    (teto, total) =  VerificaTeto(lm_final)
+    
+    if Verbose:
+        print(f"Respeita teto: {teto}\n")
+        print(f"Valor total: {total}\n")
+
+    #inicialização do dicionário de resposta
+    resposta = inicializa_dicionario()
+    
+    #preenche se houve condenação por honorários e se há outros itens além de medicamentos
+    resposta['condenacao_honorarios'] = honor 
+    resposta['possui_outros'] = outros
+    
+    
+    resposta['respeita_valor_teto'] = teto
+    resposta['valor_teto'] = "R$ {:.2f}".format(total)
+   
+   
+    #acrescenta as palavras chave encontradas.
+    resposta['lista_outros'] = matches
+    
+    if Verbose:
+        print(f"Padrões de Outros: {matches}\n")
+    
+    #adiciona as informações de medicamentos obtidas
+    for idx, (principio, nome_comercial, num_registro, preco) in enumerate(lm_final):
+        resposta['lista_medicamentos'].append({
+        "nome_extraido": lm[idx][0],
+        "nome_principio": principio,
+        "nome_comercial": nome_comercial,
+        "dosagem": lm[idx][1],
+        "registro_anvisa": num_registro,
+        "oferta_SUS": None,
+        "preco_PMVG": "R$ {:.2f}".format(preco),
+        "preco_PMVG_max": None
+        })
+    
+    
+    #resultado da aplicação da portaria em seus 6 incisos
+    resposta['aplicacao_incisos'] = [resposta['lista_medicamentos'] and resposta['respeita_valor_teto'] and not resposta['condenacao_honorarios'] and not resposta['possui_outros'],
+        False,
+        False,
+        False,
+        False,
+        False]
+
+
+    if Verbose:
+        exibe_dados(resposta)
+    
+    return resposta
+
+
+#Verifica se o PDF é searchable tentando extrair texto de suas páginas.
+def Searchable(caminho):
+    doc = fitz.open(caminho)
+    searchable = True
+
+    # Verifica todas as páginas, mas pode ser ruim para grandes documentos
+    for page in doc:
+        text = page.get_text().strip()
+        if not text:
+            searchable = False
+            break  # Se qualquer página não tiver texto, considera o documento como não pesquisável
+        
+    doc.close()
+    return searchable
+
+#Extrai texto de um PDF usando OCR em cada página e gerando uma lista de Documents.
+def ExtraiOCR(caminho):
+    doc = fitz.open(caminho)
+    
+    #vai armazenar cada página extraída
+    pages = []
+
+    num_page  = 0
+    for page in doc:
+        # Extrai a imagem da página
+        pix = page.get_pixmap()
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+        # Aplica OCR na imagem usando pytesseract
+        page_text = pytesseract.image_to_string(img, lang='por').encode('utf-8').decode('utf-8')
+        
+        #adiciona a página usando a classe Document
+        pages.append(Document(page_content=page_text, metadata={"page": num_page, "source": caminho}))
+        
+        num_page += 1
+
+    doc.close()
+    return pages
+
+

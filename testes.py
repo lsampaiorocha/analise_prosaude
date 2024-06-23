@@ -41,40 +41,57 @@ import itertools
 #expressoes regulares
 import re
 
-from analise_portaria import *
+from AnalisePortaria import *
 
 
 import pdb
 
+from openpyxl import Workbook
+
 #Roda uma bateria de testes a partir dos nomes de arquivos presentes na coleção dourada
 def roda_teste(Verbose=False, MedRobot=False, Seleciona=False, ArqSeleciona=None):
     # Caminho para o arquivo Excel
-    caminho_dourada = os.path.join(os.getcwd(), "inputs", 'colecao_dourada_1.xlsx')
+    caminho_dourada = os.path.join(os.getcwd(), "inputs", 'Colecao_dourada_2.xlsx')
     
     df = pd.read_excel(caminho_dourada)
-    lista_arquivos = df[df['petição inicial ou sentença'] == 'sentença']['nome do arquivo'].tolist()
+    lista_arquivos = df['nome do arquivo'].tolist()
     
-    #print(lista_arquivos)
+    print(lista_arquivos)
     
     resultados = []
     
     resultado = None
+            
 
     if not Seleciona:
         # Loop através dos arquivos filtrados
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(['Nome do Arquivo','Possui Outros Além de Medicamentos','Condenação Honorários Sucumbenciais (acima de 1500)','Resultado Outros','Resultado Condenação','VP_outros','FN_outros','FP_outros','VN_outros','VP_honorarios'
+                      ,'FN_honorarios',	'FP_honorarios','VN_honorarios','VP_medicamentos','FN_medicamentos'
+                      ,'FP_medicamentos','VN_medicamentos','VP_portaria','FN_portaria',
+                      'FP_portaria','VN_portaria'])
+        workbook.save('teste_dourada_2.xlsx')
         for nome_arquivo in lista_arquivos:
             print(f"Iniciando análise de {nome_arquivo}...")
             linha = df[df['nome do arquivo'] == nome_arquivo].iloc[0]
-            possui_outros = str(linha['Possui outros alem de medicamentos'])
-            condenacao = str(linha['Condenação honorários sucumbenciais (acima de 1500)'])
+            possui_outros = str(linha['Possui outros alem de medicamentos (SIM/NÃO)'])
+            condenacao = str(linha['Condenação honorários sucumbenciais (acima de 1500) (SIM/NÃO)'])
+            medicamentos=str(linha['Possui medicamentos (SIM/NÃO)'])
+            #MODIFICADO (Leonardo)
+            portaria=str(linha['Aplica-se a portaria considerando o inciso I? (SIM/NÃO)'])
             
             possui_outros = True if possui_outros.strip().lower().startswith('sim') else False
             condenacao = True if condenacao.strip().lower().startswith('sim') else False
-
+            medicamentos =  True if medicamentos.strip().lower().startswith('sim') else False
+            #MODIFICADO (Leonardo)
+            portaria = True if portaria.strip().lower().startswith('sim') else False
+            
             # Supondo que as funções verifica_condenacao e verifica_outros já estão definidas
             caminho_completo = os.path.join(os.getcwd(), "uploads", nome_arquivo)
             #pdb.set_trace()
-            resultado = portaria_prosaude(caminho_completo, Robot, Verbose)
+            resultado = AnalisePortaria(caminho_completo, MedRobot=MedRobot, Verbose=Verbose)
+            #resultado = AnalisePortaria(caminho_completo, Robot, Verbose)
             if resultado == None:
                 print(f"...Erro")
                 continue
@@ -82,7 +99,14 @@ def roda_teste(Verbose=False, MedRobot=False, Seleciona=False, ArqSeleciona=None
             resultado_condenacao = resultado['condenacao_honorarios']
             
             resultado_outros = resultado['possui_outros']
+            
+            resultado_medicamentos = False if not resultado['lista_medicamentos'] else True
 
+            #resultado_portaria = resultado_medicamentos and not resultado_condenacao and not resultado_outros
+            #MODIFICADO (Leonardo)
+            resultado_teto = resultado['respeita_valor_teto']
+            resultado_portaria = resultado_medicamentos and resultado_teto and not resultado_condenacao and not resultado_outros
+            
             resultados.append({
                 'Nome do Arquivo': nome_arquivo,
                 'Possui Outros Além de Medicamentos': possui_outros,
@@ -96,9 +120,32 @@ def roda_teste(Verbose=False, MedRobot=False, Seleciona=False, ArqSeleciona=None
                 'VP_honorarios': condenacao and resultado_condenacao,  # Verdadeiro Positivo: ambos True
                 'FN_honorarios': condenacao and not resultado_condenacao,  # Falso Negativo: possui_outros True, resultado_outros False
                 'FP_honorarios': not condenacao and resultado_condenacao,  # Falso Positivo: possui_outros False, resultado_outros True
-                'VN_honorarios': not condenacao and not resultado_condenacao  # Verdadeiro Negativo: ambos False
+                'VN_honorarios': not condenacao and not resultado_condenacao,  # Verdadeiro Negativo: ambos False
+                'VP_medicamentos': medicamentos and resultado_medicamentos,  # Verdadeiro Positivo: ambos True
+                'FN_medicamentos': medicamentos and not resultado_medicamentos,  # Falso Negativo: possui_outros True, resultado_outros False
+                'FP_medicamentos': not medicamentos and resultado_medicamentos,  # Falso Positivo: possui_outros False, resultado_outros True
+                'VN_medicamentos': not medicamentos and not resultado_medicamentos,  # Verdadeiro Negativo: ambos False
+                'VP_portaria': portaria and resultado_portaria,  # Verdadeiro Positivo: ambos True
+                'FN_portaria': portaria and not resultado_portaria,  # Falso Negativo: possui_outros True, resultado_outros False
+                'FP_portaria': not portaria and resultado_portaria,  # Falso Positivo: possui_outros False, resultado_outros True
+                'VN_portaria': not portaria and not resultado_portaria  # Verdadeiro Negativo: ambos False
+
+            
             })
+
             print(f"...Sucesso")
+            workbook = openpyxl.load_workbook('teste_dourada_2.xlsx')
+            sheet = workbook.active
+            sheet.append([nome_arquivo,possui_outros, condenacao,resultado_outros,resultado_condenacao,
+                          possui_outros and resultado_outros,possui_outros and not resultado_outros,
+                          not possui_outros and resultado_outros,not possui_outros and not resultado_outros,
+                          condenacao and resultado_condenacao,condenacao and not resultado_condenacao,
+                          not condenacao and resultado_condenacao,not condenacao and not resultado_condenacao,
+                          medicamentos and resultado_medicamentos,medicamentos and not resultado_medicamentos,
+                          not medicamentos and resultado_medicamentos,not medicamentos and not resultado_medicamentos,
+                          portaria and resultado_portaria,portaria and not resultado_portaria,
+                          not portaria and resultado_portaria, not portaria and not resultado_portaria])
+            workbook.save('teste_dourada_2.xlsx')
     else:
         nome_arquivo = ArqSeleciona
         print(f"Iniciando análise de {nome_arquivo}...")
@@ -112,7 +159,7 @@ def roda_teste(Verbose=False, MedRobot=False, Seleciona=False, ArqSeleciona=None
         # Supondo que as funções verifica_condenacao e verifica_outros já estão definidas
         caminho_completo = os.path.join(os.getcwd(), "uploads", nome_arquivo)
         #pdb.set_trace()
-        resultado = portaria_prosaude(caminho_completo, Robot, Verbose)
+        resultado = AnalisePortaria(caminho_completo, Robot, Verbose)
         if resultado == None:
             print(f"...Erro")
             
@@ -146,18 +193,18 @@ def roda_teste(Verbose=False, MedRobot=False, Seleciona=False, ArqSeleciona=None
 
 
 #caminho_completo = os.path.join(os.getcwd(), "uploads", "sentenca_II_8.pdf")
-#roda_teste(Seleciona=False, ArqSeleciona="sentenca_II_8.pdf")
+#roda_teste(Seleciona=False, Verbose=False, MedRobot=True)
 
 caminho_completo = os.path.join(os.getcwd(), "uploads", "sentenca_I_4.pdf")
 
-portaria_prosaude(caminho_completo, Verbose=True, MedRobot=True)
+AnalisePortaria(caminho_completo, Verbose=True, MedRobot=False)
 
 
 
 """
 caminho_completo = os.path.join(os.getcwd(), "uploads", "sentenca_II_1.pdf")
 print("É pra ser True - sentenca_II_1.pdf\n")
-portaria_prosaude(caminho_completo, Verbose=True)
+AnalisePortaria(caminho_completo, Verbose=True)
 print("\n")
 
 
