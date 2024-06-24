@@ -1,6 +1,13 @@
-from langchain_community.vectorstores import Chroma
+#função para monitorar os custos
+from langchain_community.callbacks import get_openai_callback
+from langchain_openai.chat_models import ChatOpenAI
 
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts import PromptTemplate
+from langchain_core.documents import Document
+
 
 #organizar outputs
 from langchain_core.output_parsers import JsonOutputParser
@@ -22,13 +29,65 @@ class Medicamentos(BaseModel):
 
 #Recebe uma retrieval chain de uma sentença e retorna uma lista de medicamentos presentes
 # pares (medicamento, dosagem_em_mg)
-def AnaliseMedicamentos(chain, llm, Verbose=False):
+def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False):
+
+
+    if model == "gpt-4":
+        llm = ChatOpenAI(model_name="gpt-4", temperature=0)
+        #prompt do robô - context vai ser preenchido pela retrieval dos documentos
+        system_prompt = (
+            "Você é um assessor jurídico analisando documentos jurídicos que podem conter petições, decisões ou sentenças de fornecimento de itens de saúde, tais como medicamentos."
+            "Sua tarefa consiste em extrair dos documentos os nomes e as dosagens de medicamentos, caso possua."
+            "Considere como medicamentos apenas substâncias ou compostos farmacêuticos usados exclusivamente para tratar, prevenir ou curar doenças. "
+            "Utilize o contexto para responder às perguntas."
+            "Seja conciso nas respostas."
+            "Contexto: {context}"
+        )
+    elif model == "gpt-3.5-turbo":
+        
+        llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+        system_prompt = (
+        "Você é um assessor jurídico analisando um documento que contém uma decisão judicial."
+        "Utilize o contexto para responder às perguntas. "
+        "Seja conciso nas respostas, entregando apenas as informações solicitadas"
+        "Contexto: {context}"
+        )
+
+    #prompt do chat
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("human", "{input}"),
+        ]
+    )
+
+    #cria uma chain de perguntas e respostas
+    question_answer_chain = create_stuff_documents_chain(llm, prompt)
+
+    #cria uma chain de retrieval para realizar as perguntas e respostas
+    chain = create_retrieval_chain(docsearch.as_retriever(), question_answer_chain)
+
 
     lm = [] #lista de medicamentos
+    cost = 0
 
-    #Aqui o objetivo dos prompts é listar os itens que são medicamentos
-
-    q1 = """
+    if model == "gpt-4":
+        #Aqui o objetivo dos prompts é listar os itens que são medicamentos
+        q1 = """
+            Você é um assessor jurídico analisando um documento que contém uma petições ou decisão judicial.
+        
+            Considere como medicamentos apenas substâncias ou compostos farmacêuticos usados exclusivamente para tratar, prevenir ou curar doenças. 
+        
+            Outros itens médicos ou de assistência, como fraldas, seringas, luvas, oxímetro, leitos hospitalares ou termômetros não são medicamentos
+            
+            Sua tarefa é fornecer uma lista contendo apenas os itens que são medicamentos na decisão judicial e a dosagem em miligramas(MG).
+            
+            Nunca calcule a dosagem total, o que interessa é a dosagem para cada caixa de medicamento.
+            
+            Em hipótese alguma forneça na lista medicamentos que não estavam na decisão. Se não houverem medicamentos, apenas responda que não há medicamentos.
+        """
+    elif model == "gpt-3.5-turbo":
+        q1 = """
         Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
     
         Considere como medicamentos apenas substâncias ou compostos farmacêuticos usados exclusivamente para tratar, prevenir ou curar doenças. 
@@ -38,15 +97,15 @@ def AnaliseMedicamentos(chain, llm, Verbose=False):
         Sua tarefa é fornecer uma lista contendo apenas os itens que são medicamentos na decisão judicial e a dosagem em miligramas(MG).
         
         Em hipótese alguma forneça na lista medicamentos que não estavam na decisão. Se não houverem medicamentos, apenas responda que não há medicamentos.
-    """
+        """
     
-    r1 = chain.invoke({"input": q1}).get('answer')
-    
-    
-    if Verbose:
-        print(f"Medicamentos presentes na sentença: {r1}")
-    
+    with get_openai_callback() as c1:
+        r1 = chain.invoke({"input": q1}).get('answer')
+        cost += c1.total_cost
 
+    if Verbose:
+        print(f"Medicamentos presentes no documento judicial: {r1}")
+    
     parser = JsonOutputParser(pydantic_object=Medicamentos)
 
     prompt = PromptTemplate(
@@ -56,11 +115,13 @@ def AnaliseMedicamentos(chain, llm, Verbose=False):
     )
 
     chain2 = prompt | llm | parser
-
-    lm = chain2.invoke({"query": r1}).get("meds")
+    
+    with get_openai_callback() as c2:
+        lm = chain2.invoke({"query": r1}).get("meds")
+        cost += c2.total_cost
 
     if Verbose:
-        print(f"Medicamentos extraidos da sentença: {lm}")  
+        print(f"Medicamentos extraidos do documento judicial: {lm}")  
     
     r = []
     
@@ -75,7 +136,7 @@ def AnaliseMedicamentos(chain, llm, Verbose=False):
     if Verbose:
         print(f"Medicamentos já dentro da estrutura: {r}") 
  
-    return r
+    return (r, cost)
 
 
 #Recebe uma lista com tuplas (medicamento, dose_em_mg, nome_comercial, registro_anvisa, valor)

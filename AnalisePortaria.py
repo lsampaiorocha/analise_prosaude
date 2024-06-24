@@ -46,8 +46,8 @@ api_key = os.environ.get('OPENAI_API_KEY')
 if not api_key:
     raise RuntimeError("OPENAI_API_KEY não está definida")
 
-#llm = ChatOpenAI(model_name="gpt-4", temperature=0)
-llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+#llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+llm = ChatOpenAI(model_name="gpt-4", temperature=0)
 embeddings = OpenAIEmbeddings()
 
 #Inicialização do dicionário que irá conter as respostas a serem devolvidas pela API
@@ -118,7 +118,7 @@ def exibe_dados(dados):
 #e retorna um dicionário com todas informações relacionadas à aplicação da portaria 01/2017
 #MedRobot controla se o robô de consultas no google e anvisa será utilizado (há uma maior demora)
 #Decisao indica se trata-se de sentença ou decisão, ou se trata-se da petição inicial
-def AnalisePortaria(caminho, Verbose=False, MedRobot=True, Mode="Sentença"):
+def AnalisePortaria(caminho, models, Verbose=False, MedRobot=True, Mode="Sentença"):
     
     if Verbose:
         print("Modo verbose ativado.")    
@@ -133,41 +133,18 @@ def AnalisePortaria(caminho, Verbose=False, MedRobot=True, Mode="Sentença"):
             print(f"Número de páginas após pré-processamento: {len(filtered_pages)}\n")
             for page in filtered_pages:
                 print(f"Página {page.metadata['page']}")
-                #print(f"Página {page.page_content}")
+                print(f"Página {page.page_content}")
 
         # cria ids para as páginas, o que vai ser útil para gerenciar o banco de dados de vetores
         ids = [str(i) for i in range(1, len(filtered_pages) + 1)]
 
         #utiliza embeddings da OpenAI para o banco de vetores Chroma
         embeddings = OpenAIEmbeddings()
-        docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024})
+        docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024}) #essa opção "hnsw:M": 1024 é importante para não ter problemas
         #db = Chroma.from_documents(docs, embedding_model, persist_directory="./chroma_db_instance",collection_metadata={"hnsw:M": 1024,"hnsw:ef": 64})
             
-        #prompt do robô - context vai ser preenchido pela retrieval dos documentos
-        system_prompt = (
-            "Você é um assessor jurídico analisando um documento que contém uma decisão judicial."
-            "Utilize o contexto para responder às perguntas. "
-            "Utilize apenas o contexto que se referir à decisão do juiz sobre o caso, em que é utilizado expressões como: sentença, julgo procedente, dispositivo, ratifico a decisão, "
-            "Seja conciso nas respostas, entregando apenas as informações solicitadas"
-            "Contexto: {context}"
-        )
-
-        #prompt do chat
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system_prompt),
-                ("human", "{input}"),
-            ]
-        )
-
-        #cria uma chain de perguntas e respostas
-        question_answer_chain = create_stuff_documents_chain(llm, prompt)
-
-        #cria uma chain de retrieval para realizar as perguntas e respostas
-        chain = create_retrieval_chain(docsearch.as_retriever(), question_answer_chain)
-
         #aplica o pipeline de análise
-        resposta = AnaliseMedicamentosPipeline(chain, filtered_pages, Verbose, MedRobot)
+        resposta = AnaliseMedicamentosPipeline(filtered_pages, docsearch, models, Verbose, MedRobot)
 
         #apaga as entradas criadas no Chroma
         docsearch._collection.delete(ids=ids)
@@ -199,7 +176,7 @@ def preprocessamento(caminho, Verbose=False, Mode="Sentença"):
     
     if Mode == "Sentença" or Mode == "Decisão":
         # Lista de palavras-chave que deseja filtrar - esta palavra tem sido suficiente para encontrar a página da sentença ou decisão
-        palavras_filtro = ['julgo']
+        palavras_filtro = ['julgo', 'julgar procedente']
 
         # Construindo a expressão regular para filtrar apenas as páginas que contém a sentença ou decisão
         # Usamos \b para garantir que estamos capturando palavras inteiras
@@ -239,16 +216,32 @@ def preprocessamento(caminho, Verbose=False, Mode="Sentença"):
 
 #Realiza todas as tarefas de análise necessárias para obtenção das informações
 #retorna um dicionário com as informações obtidas
-def AnaliseMedicamentosPipeline(chain, pages, Verbose=False, MedRobot=True):
+def AnaliseMedicamentosPipeline(pages, docsearch, models, Verbose=False, MedRobot=True):
     
     #analisa se existe condenação por honorários na sentença
-    honor = AnaliseHonorarios(chain, llm, Verbose)    
+    (honor, chonor) = AnaliseHonorarios(docsearch, model=models['honorarios'], Verbose=Verbose)    
     
     #analisa se existe outros itens alem de medicamentos na sentença
-    (outros, matches) = AnaliseOutros(pages, Verbose)
+    outrosregex = False
+    outrosllm = False
+    listaoutrosllm = []
+    coutros=0
+    (outrosregex, listaoutrosregex) = AnaliseOutrosRegex(pages, Verbose)
+    
+    #so vale a pena usar llm para detectar outros se for o gpt 4
+    if models['outros'] != None:
+        (outrosllm, listaoutrosllm, coutros) = AnaliseOutrosLLM(docsearch, model=models['outros'], Verbose=Verbose)
+    
+    #Combina as respostas usando regex e LLM para detecção de outros itens
+    outros = outrosregex or outrosllm
+    if outrosllm:
+        listaoutros = listaoutrosllm
+    else:
+        listaoutros = listaoutrosregex
+
     
     #lista contendo os nomes de medicamentos obtidos da sentença
-    lm = AnaliseMedicamentos(chain, llm, Verbose)
+    (lm, cmeds) = AnaliseMedicamentos(docsearch, model=models['medicamentos'], Verbose=Verbose)
 
     lm_busca = []
     lm_final = []
@@ -293,10 +286,10 @@ def AnaliseMedicamentosPipeline(chain, pages, Verbose=False, MedRobot=True):
    
    
     #acrescenta as palavras chave encontradas.
-    resposta['lista_outros'] = matches
+    resposta['lista_outros'] = listaoutros
     
     if Verbose:
-        print(f"Padrões de Outros: {matches}\n")
+        print(f"Lista de Outros: {listaoutros}\n")
     
     #adiciona as informações de medicamentos obtidas
     for idx, (principio, nome_comercial, num_registro, preco) in enumerate(lm_final):
@@ -323,6 +316,10 @@ def AnaliseMedicamentosPipeline(chain, pages, Verbose=False, MedRobot=True):
 
     if Verbose:
         exibe_dados(resposta)
+        print(f"Custo com LLMs para extração de medicamentos: {"$ {:.4f}".format(cmeds)}")
+        print(f"Custo com LLMs para extração de outros itens: {"$ {:.4f}".format(coutros)}")
+        print(f"Custo com LLMs para detecção de condenação por honorários: {"$ {:.4f}".format(chonor)}")
+        print(f"Custo total com LLMs: {"$ {:.4f}".format(coutros+cmeds+chonor)}")
     
     return resposta
 

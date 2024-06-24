@@ -195,10 +195,16 @@ def roda_teste(Verbose=False, MedRobot=False, Seleciona=False, ArqSeleciona=None
 #caminho_completo = os.path.join(os.getcwd(), "uploads", "sentenca_II_8.pdf")
 #roda_teste(Seleciona=False, Verbose=False, MedRobot=True)
 
-caminho_completo = os.path.join(os.getcwd(), "uploads", "sentenca_I_4.pdf")
+caminho_completo = os.path.join(os.getcwd(), "uploads", "sentenca_I_9.pdf")
 
-AnalisePortaria(caminho_completo, Verbose=True, MedRobot=False)
+#caminho_completo = r'H:\Meu Drive\Trabalhos\2023\projetos\UNIFOR\prosaude\robo_portaria_v6\uploads\sentenca_I_9.pdf'
 
+models = {
+    "honorarios" : "gpt-3.5-turbo", 
+    "outros" : None, 
+    "medicamentos" : "gpt-3.5-turbo"
+}
+AnalisePortaria(caminho_completo, models, Verbose=True, MedRobot=False)
 
 
 """
