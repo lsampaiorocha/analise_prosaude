@@ -10,7 +10,7 @@ def AnaliseHonorarios(docsearch, model="gpt-3.5-turbo", Verbose=False):
     
     cost = 0
 
-    if model == "gpt-4":
+    if model == "gpt-4" or model == "gpt-4o":
         llm = ChatOpenAI(model_name="gpt-4", temperature=0)
         #prompt do robô - context vai ser preenchido pela retrieval dos documentos
         system_prompt = (
@@ -53,7 +53,7 @@ def AnaliseHonorarios(docsearch, model="gpt-3.5-turbo", Verbose=False):
     #cria uma chain de retrieval para realizar as perguntas e respostas
     chain = create_retrieval_chain(docsearch.as_retriever(), question_answer_chain)
     
-    if model == "gpt-4":
+    if model == "gpt-4" or model == "gpt-4o":
         q1 = """
         Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
 

@@ -47,7 +47,7 @@ if not api_key:
     raise RuntimeError("OPENAI_API_KEY não está definida")
 
 #llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
-llm = ChatOpenAI(model_name="gpt-4", temperature=0)
+#llm = ChatOpenAI(model_name="gpt-4o", temperature=0)
 embeddings = OpenAIEmbeddings()
 
 #Inicialização do dicionário que irá conter as respostas a serem devolvidas pela API
@@ -80,7 +80,9 @@ def inicializa_dicionario():
     #tratamento multidisciplinar disponibilizado pelo SUS:, fisioterapia, fonoaudiologia, oxigênio domiciliar, embolização e oxigenoterapia hiperbárica...
     "lista_tratamento": [],
     #para cada inciso (1-6) indica se ele foi aplicado
-    "aplicacao_incisos": [False, False, False, False, False, False]  
+    "aplicacao_incisos": [False, False, False, False, False, False] ,
+    #custo dos LLMs utilizados no processo
+    "custollm": 0, 
   }
   return dados
 
@@ -113,6 +115,8 @@ def exibe_dados(dados):
     print("Aplicação dos Incisos:")
     for i, aplicado in enumerate(dados['aplicacao_incisos'], start=1):
         print(f"  Inciso {i}: {True if aplicado else False}")
+        
+    print(f"Custo Total dos LLMs: {dados['custollm']}")
 
 #Função principal da API, que recebe o caminho de um arquivo contendo uma sentença ou petição inicial
 #e retorna um dicionário com todas informações relacionadas à aplicação da portaria 01/2017
@@ -125,7 +129,7 @@ def AnalisePortaria(caminho, models, Verbose=False, MedRobot=True, Mode="Senten�
         if MedRobot:
             print("MedRobot está ativado.")
             
-    #realiza o preprocessamento das paginas do pdf
+    #realiza o preprocessamento e filtragem das paginas do pdf
     filtered_pages = preprocessamento(caminho, Verbose, Mode)
   
     try:
@@ -174,13 +178,14 @@ def preprocessamento(caminho, Verbose=False, Mode="Sentença"):
     if Verbose:    
         print(f"Número de páginas lidas do arquivo: {len(pages)}")
     
-    if Mode == "Sentença" or Mode == "Decisão":
+    if Mode == "Sentença":
         # Lista de palavras-chave que deseja filtrar - esta palavra tem sido suficiente para encontrar a página da sentença ou decisão
-        palavras_filtro = ['julgo', 'julgar procedente']
+        palavras_filtro = ['julgo', 'julgar procedente', 'julgando procedente', 'sentença']
 
         # Construindo a expressão regular para filtrar apenas as páginas que contém a sentença ou decisão
         # Usamos \b para garantir que estamos capturando palavras inteiras
         filtro_regex = re.compile(r'\b' + r'\b|\b'.join([re.escape(keyword) for keyword in palavras_filtro]) + r'\b', re.IGNORECASE)
+        #filtro_regex = re.compile(r'(^|\b)' + r'(^|\b)|(^|\b)'.join([re.escape(keyword) for keyword in palavras_filtro]) + r'(^|\b)', re.IGNORECASE)
         
         # Filtrando páginas com base nas palavras-chave
         filtered_pages = [page for page in pages if filtro_regex.search(page.page_content)]
@@ -193,13 +198,16 @@ def preprocessamento(caminho, Verbose=False, Mode="Sentença"):
         if pages[0] not in filtered_pages:
             filtered_pages.append(pages[0])
 
-        #garante que a ultima pagina estara presente
+        #garante que as ultimas paginas estarao presentes
+        #if pages[-2] not in filtered_pages:
+        #    filtered_pages.append(pages[-2])
         if pages[-1] not in filtered_pages:
             filtered_pages.append(pages[-1])
+        
             
-    else:
+    elif Mode == "Decisão":
         # Lista de palavras-chave que deseja filtrar - esta palavra tem sido suficiente para encontrar a página da sentença ou decisão
-        palavras_filtro = ['do pedido','dos pedidos', 'pedidos e requerimentos', 'síntese fática']
+        palavras_filtro = ['decisão', 'defiro', 'tutela', 'indefiro', 'concedo', 'conceder', 'estão presentes os pressupostos para concessão']
 
         # Construindo a expressão regular para filtrar apenas as páginas que contém a sentença ou decisão
         # Usamos \b para garantir que estamos capturando palavras inteiras
@@ -211,34 +219,43 @@ def preprocessamento(caminho, Verbose=False, Mode="Sentença"):
         if Verbose:
             print(f"Número de páginas da inicial filtradas por regex: {len(filtered_pages)}")
             print(f"Páginas da inicial filtradas por regex: {filtered_pages}")
+        
+        #garante que a primeira pagina estara presente
+        #if pages[0] not in filtered_pages:
+        #    filtered_pages.append(pages[0])
+
+        #garante que as ultimas paginas estarao presentes
+        #if pages[-2] not in filtered_pages:
+        #    filtered_pages.append(pages[-2])
+        #if pages[-1] not in filtered_pages:
+        #    filtered_pages.append(pages[-1])
+        
 
     return filtered_pages
 
 #Realiza todas as tarefas de análise necessárias para obtenção das informações
 #retorna um dicionário com as informações obtidas
 def AnaliseMedicamentosPipeline(pages, docsearch, models, Verbose=False, MedRobot=True):
-    
+
     #analisa se existe condenação por honorários na sentença
-    (honor, chonor) = AnaliseHonorarios(docsearch, model=models['honorarios'], Verbose=Verbose)    
+    (honor, chonor) = AnaliseHonorarios(docsearch, model=models['honorarios'], Verbose=Verbose)
     
+
     #analisa se existe outros itens alem de medicamentos na sentença
-    outrosregex = False
-    outrosllm = False
-    listaoutrosllm = []
     coutros=0
+    cdoutros=0
     (outrosregex, listaoutrosregex) = AnaliseOutrosRegex(pages, Verbose)
     
-    #so vale a pena usar llm para detectar outros se for o gpt 4
-    if models['outros'] != None:
-        (outrosllm, listaoutrosllm, coutros) = AnaliseOutrosLLM(docsearch, model=models['outros'], Verbose=Verbose)
+    listaoutros = listaoutrosregex
     
-    #Combina as respostas usando regex e LLM para detecção de outros itens
-    outros = outrosregex or outrosllm
-    if outrosllm:
-        listaoutros = listaoutrosllm
-    else:
-        listaoutros = listaoutrosregex
-
+    #detecta (usando LLM) se existem outros itens além de medicamentos na sentença
+    (doutrosllm, cdoutros) = DetectaOutrosLLM(docsearch, model=models['doutros'], Verbose=Verbose) 
+    
+    outros=False
+    #só aplica a detecção de outros itens se o LLM e o regex concordarem que é o caso
+    if doutrosllm:
+        if outrosregex:
+            outros = True   
     
     #lista contendo os nomes de medicamentos obtidos da sentença
     (lm, cmeds) = AnaliseMedicamentos(docsearch, model=models['medicamentos'], Verbose=Verbose)
@@ -246,7 +263,8 @@ def AnaliseMedicamentosPipeline(pages, docsearch, models, Verbose=False, MedRobo
     lm_busca = []
     lm_final = []
 
-    if MedRobot == True:
+    #verifica se robô de consulta está ativado e existe algum item na lista
+    if MedRobot == True and lm:
         lm_busca = RoboGoogleAnvisa(lm)
         lm_final = ConsultaCMED(lm_busca,lm)
     #caso não se esteja utilizando o robô, não será possível coletar as informações sobre os medicamentos
@@ -317,9 +335,13 @@ def AnaliseMedicamentosPipeline(pages, docsearch, models, Verbose=False, MedRobo
     if Verbose:
         exibe_dados(resposta)
         print(f"Custo com LLMs para extração de medicamentos: {"$ {:.4f}".format(cmeds)}")
+        print(f"Custo com LLMs para detecção de outros itens: {"$ {:.4f}".format(cdoutros)}")
         print(f"Custo com LLMs para extração de outros itens: {"$ {:.4f}".format(coutros)}")
         print(f"Custo com LLMs para detecção de condenação por honorários: {"$ {:.4f}".format(chonor)}")
-        print(f"Custo total com LLMs: {"$ {:.4f}".format(coutros+cmeds+chonor)}")
+        print(f"Custo total com LLMs: {"$ {:.4f}".format(cdoutros+coutros+cmeds+chonor)}")
+    
+    #custo total com LLMs
+    resposta['custollm'] = cdoutros+coutros+cmeds+chonor
     
     return resposta
 

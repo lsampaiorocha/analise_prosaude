@@ -32,7 +32,7 @@ class Medicamentos(BaseModel):
 def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False):
 
 
-    if model == "gpt-4":
+    if model == "gpt-4" or model == "gpt-4o":
         llm = ChatOpenAI(model_name="gpt-4", temperature=0)
         #prompt do robô - context vai ser preenchido pela retrieval dos documentos
         system_prompt = (
@@ -71,7 +71,7 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False):
     lm = [] #lista de medicamentos
     cost = 0
 
-    if model == "gpt-4":
+    if model == "gpt-4" or model == "gpt-4o":
         #Aqui o objetivo dos prompts é listar os itens que são medicamentos
         q1 = """
             Você é um assessor jurídico analisando um documento que contém uma petições ou decisão judicial.
