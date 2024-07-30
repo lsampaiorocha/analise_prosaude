@@ -50,7 +50,7 @@ from openpyxl import Workbook
 #Roda uma bateria de testes a partir dos nomes de arquivos presentes na coleção dourada
 def roda_teste(models, Verbose=False, MedRobot=False, Seleciona=False, ArqSeleciona=None):
     # Caminho para o arquivo Excel
-    caminho_dourada = os.path.join(os.getcwd(), "inputs", 'Colecao_dourada_2.xlsx')
+    caminho_dourada = os.path.join(os.getcwd(), "inputs", 'Colecao_dourada_decisoes.xlsx')
     
     df = pd.read_excel(caminho_dourada)
     lista_arquivos = df['nome do arquivo'].tolist()
@@ -95,7 +95,7 @@ def roda_teste(models, Verbose=False, MedRobot=False, Seleciona=False, ArqSeleci
                       'Custo', 
                       'Lista de medicamentos', 
                       'Lista de Outros'])
-        workbook.save('teste_dourada_5.xlsx')
+        workbook.save('teste_dourada_decisoes_1.xlsx')
         for nome_arquivo in lista_arquivos:
             print(f"Iniciando análise de {nome_arquivo}...")
             linha = df[df['nome do arquivo'] == nome_arquivo].iloc[0]
@@ -114,7 +114,7 @@ def roda_teste(models, Verbose=False, MedRobot=False, Seleciona=False, ArqSeleci
             # Supondo que as funções verifica_condenacao e verifica_outros já estão definidas
             caminho_completo = os.path.join(os.getcwd(), "uploads", nome_arquivo)
             #pdb.set_trace()
-            resultado = AnalisePortaria(caminho_completo, models, MedRobot=MedRobot, Verbose=Verbose)
+            resultado = AnalisePortaria(caminho_completo, models, TipoDocumento="Decisão", MedRobot=MedRobot, Verbose=Verbose)
             #resultado = AnalisePortaria(caminho_completo, Robot, Verbose)
             if resultado == None:
                 print(f"...Erro")
@@ -166,7 +166,7 @@ def roda_teste(models, Verbose=False, MedRobot=False, Seleciona=False, ArqSeleci
             })
 
             print(f"...Sucesso")
-            workbook = openpyxl.load_workbook('teste_dourada_5.xlsx')
+            workbook = openpyxl.load_workbook('teste_dourada_decisoes_1.xlsx')
             sheet = workbook.active
             sheet.append([nome_arquivo,
                           possui_outros, 
@@ -198,7 +198,7 @@ def roda_teste(models, Verbose=False, MedRobot=False, Seleciona=False, ArqSeleci
                           str(resultado['lista_medicamentos']),
                           str(resultado['lista_outros'])
             ]) 
-            workbook.save('teste_dourada_5.xlsx')
+            workbook.save('teste_dourada_decisoes_1.xlsx')
     else:
         nome_arquivo = ArqSeleciona
         print(f"Iniciando análise de {nome_arquivo}...")
@@ -246,7 +246,7 @@ def roda_teste(models, Verbose=False, MedRobot=False, Seleciona=False, ArqSeleci
 
 
 
-#Roda uma bateria de testes a partir dos nomes de arquivos presentes na coleção dourada
+#Roda testes em módulos específicos, configurados a partir do dicionário modulos
 def teste_unitario(caminho, models, modulos, Verbose=False, MedRobot=False, Mode="Sentença"):
     
     if Verbose:
@@ -255,14 +255,14 @@ def teste_unitario(caminho, models, modulos, Verbose=False, MedRobot=False, Mode
             print("MedRobot está ativado.")
             
     #realiza o preprocessamento das paginas do pdf
-    filtered_pages = preprocessamento(caminho, Verbose, Mode)
+    filtered_pages = preprocessamento(caminho, models, Verbose, Mode)
   
     try:
         if Verbose:    
             print(f"Número de páginas após pré-processamento: {len(filtered_pages)}\n")
-            for page in filtered_pages:
-                print(f"Página {page.metadata['page']}")
-                print(f"Página {page.page_content}")
+            #for page in filtered_pages:
+            #    print(f"Página {page.metadata['page']}")
+            #    print(f"Página {page.page_content}")
 
         # cria ids para as páginas, o que vai ser útil para gerenciar o banco de dados de vetores
         ids = [str(i) for i in range(1, len(filtered_pages) + 1)]
@@ -279,7 +279,11 @@ def teste_unitario(caminho, models, modulos, Verbose=False, MedRobot=False, Mode
             listaoutrosllm = []
             coutros=0
             cdoutros=0
-            (outrosregex, listaoutrosregex) = AnaliseOutrosRegex(filtered_pages, Verbose)
+            (outrosregex_permitidos, listaoutrosregex_permitidos, outrosregex_proibidos, listaoutrosregex_proibidos) = AnaliseOutrosRegex(filtered_pages, Verbose)
+            
+            #verifica se existe algum item de outros
+            outrosregex = outrosregex_permitidos or outrosregex_proibidos
+            listaoutrosregex = listaoutrosregex_permitidos + listaoutrosregex_proibidos
             
             if Verbose:
                 print(f"Regex detectou outros:{outrosregex}")
@@ -289,10 +293,10 @@ def teste_unitario(caminho, models, modulos, Verbose=False, MedRobot=False, Mode
             #detecta (usando LLM) se existem outros itens além de medicamentos na sentença
             (doutrosllm, cdoutros) = DetectaOutrosLLM(docsearch, model=models['doutros'], Verbose=Verbose)
             
-            (outrosllm, listaoutrosllm, coutros) = AnaliseOutrosLLM(docsearch, model=models['outros'], Verbose=Verbose)
+            #(outrosllm, listaoutrosllm, coutros) = AnaliseOutrosLLM(docsearch, model=models['outros'], Verbose=Verbose)
         
             routros = False
-            if outrosllm:
+            if doutrosllm:
                 if outrosregex:
                     routros = True    
             
@@ -316,11 +320,21 @@ def teste_unitario(caminho, models, modulos, Verbose=False, MedRobot=False, Mode
                 print(f"Custo com LLMs para detecção de outros itens: {"$ {:.4f}".format(cdoutros+coutros)}")
             #apaga as entradas criadas no Chroma
         
+        
+        if modulos['alimentares']:
+            #detecta (usando LLM) se existem outros itens além de medicamentos na sentença
+            (alim, calim) = AnaliseAlimentares(docsearch, model=models['alimentares'], Verbose=Verbose)
+            
+            print(f"Usando {models['alimentares']} detecção de itens alimentares:{alim}")
+        
+            print(f"Custo Detecção de itens alimentares usando {models['alimentares']}: {calim}")
+            
+            
         #Testa o modulo de detecção de extração de outros itens na sentença
         if modulos['honorarios']:            
             
             #analisa se existe condenação por honorários na sentença
-            (honor, chonor) = AnaliseHonorarios(docsearch, model=models['honorarios'], Verbose=Verbose)
+            (honor, chonor) = AnaliseHonorarios(docsearch, model=models['honorarios'], Verbose=Verbose, Resumo=Resumo)
             
             
             print(f"Usando {models['honorarios']} detecção de cond. honorários:{honor}")
@@ -340,42 +354,21 @@ def teste_unitario(caminho, models, modulos, Verbose=False, MedRobot=False, Mode
     except Exception as e:
         print(f"Erro ao processar o arquivo {caminho.split()[-1]}: {e}")
         return None
- 
- 
-def teste_agora():           
-    # Lista de palavras-chave que deseja filtrar - esta palavra tem sido suficiente para encontrar a página da sentença ou decisão
-    palavras_filtro = ['decisão', 'defiro', 'tutela', 'indefiro', 'concedo', 'conceder', 'estão presentes os pressupostos para concessão']
-
-    # Construindo a expressão regular para filtrar apenas as páginas que contém a sentença ou decisão
-    # Usamos \b para garantir que estamos capturando palavras inteiras
-    filtro_regex = re.compile(r'\b' + r'\b|\b'.join([re.escape(keyword) for keyword in palavras_filtro]) + r'\b', re.IGNORECASE)
-    
-    # Texto de exemplo
-    text = """
-    Considerando o disposto no art. 300 do CPC c/c 196 da Constituição Federal, bem como balizada na Doutrina da Proteção Integral,
-    DEFIRO A TUTELA DE URGÊNCIA, determinando que o Estado do Ceará e o Município de Milhã forneçam ao substituído
-    fraldas descartáveis (ID 78301464), alimentação complementada via oral com suplementação ID 78301453/ID 78301454) e
-    medicação Vigabatrina (ID 78301455/ID 78301457) , conforme prescrições anexadas aos autos,  por período indeterminado, no
-    prazo de 05 (cinco) dias , sob pena de multa de R$ 500,00 (quinhentos reais) por dia de descumprimento, limitada ao valor de R$
-    10.000,00 (dez mil reais).
-    """
-
-    # Verificando se o regex detecta corretamente as palavras-chave
-    if filtro_regex.search(text):
-        print("Palavra-chave encontrada!")
-    else:
-        print("Palavra-chave não encontrada.")
-
           
 models = {
-    "honorarios" : "gpt-3.5-turbo", 
+    "honorarios" : "gpt-3.5-turbo-16k", 
     #"honorarios" : "gpt-4o",
     #"outros" : "gpt-4o", 
     #"outros" : "gpt-3.5-turbo", 
     #"doutros" : "gpt-4o",
-    "doutros" : "gpt-3.5-turbo", 
-    #"medicamentos" : "gpt-4"
-    "medicamentos" : "gpt-4o",
+    "doutros" : "gpt-3.5-turbo-16k", 
+    #"doutros" : "gpt-4o",
+    #"medicamentos" : "gpt-4o",
+    "medicamentos" : "gpt-3.5-turbo",
+    #"alimentares" : "gpt-4o",
+    "alimentares" : "gpt-3.5-turbo-16k",    
+    #"resumo" : "gpt-4o",
+    "resumo" : "gpt-4o"
 }
 
 
@@ -390,24 +383,25 @@ models = {
 
 modulos = {
     "medicamentos" : False,
-    "outros" : False, 
-    "honorarios" : True, 
+    "alimentares" : False,
+    "outros" : True, 
+    "honorarios" : False, 
     "precos" : False,
 }
 
 #caminho_completo = os.path.join(os.getcwd(), "uploads", "sentenca_II_8.pdf")
 #roda_teste(models=models, Seleciona=False, Verbose=False, MedRobot=True)
 
-caminho_completo = os.path.join(os.getcwd(), "uploads", "decisao_I_1.pdf")
+caminho_completo = os.path.join(os.getcwd(), "uploads", "decisao_I_4.pdf")
 
 #caminho_completo = r'H:\Meu Drive\Trabalhos\2023\projetos\UNIFOR\prosaude\robo_portaria_v6\uploads\sentenca_I_9.pdf'
 
-#AnalisePortaria(caminho_completo, models, Verbose=True, MedRobot=False)
-AnalisePortaria(caminho_completo, models, Mode="Decisão", Verbose=True, MedRobot=False)
+#AnalisePortaria(caminho_completo,  models, Mode="Decisão", Verbose=True, MedRobot=False)
+AnalisePortaria(caminho_completo, models, TipoDocumento="Decisão", Verbose=True, MedRobot=True, Resumo=True)
 
-#teste_agora()
 
-#teste_unitario(caminho_completo, modulos=modulos, models=models, Verbose=True, MedRobot=False, Mode="Sentença")
+
+#teste_unitario(caminho_completo, modulos=modulos, models=models, Verbose=True, MedRobot=False, Mode="Decisão")
 
 """
 caminho_completo = os.path.join(os.getcwd(), "uploads", "sentenca_II_1.pdf")

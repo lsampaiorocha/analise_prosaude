@@ -6,46 +6,38 @@ from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 
 #Recebe uma retrieval chain de uma sentença e retorna Sim ou não se houve condenação do estado do ceará ao pagamento de honorários
-def AnaliseHonorarios(docsearch, model="gpt-3.5-turbo", Verbose=False):
+def AnaliseHonorarios(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=True):
     
     cost = 0
 
-    if model == "gpt-4" or model == "gpt-4o":
-        llm = ChatOpenAI(model_name="gpt-4", temperature=0)
+    #caso seja análise de um documento, e não do seu resumo
+    if not Resumo:
+        llm = ChatOpenAI(model_name=model, temperature=0)
         #prompt do robô - context vai ser preenchido pela retrieval dos documentos
         system_prompt = (
             "Você é um assessor jurídico analisando um documento que contém uma decisão judicial."
             "Utilize o contexto para responder às perguntas. "
             "Seja conciso nas respostas, entregando apenas as informações solicitadas"
             "Contexto: {context}"
-            )
-        
-        
-
-        #prompt do chat
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system_prompt),
-                ("human", "{input}"),
-            ]
-        )    
-    elif model == "gpt-3.5-turbo":
+            )  
+    #caso seja análise de um resumo
+    else:
         llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
         #prompt do robô - context vai ser preenchido pela retrieval dos documentos
         system_prompt = (
-            "Você é um assessor jurídico analisando um documento que contém uma decisão judicial."
-            "Utilize o contexto para responder às perguntas. "
+            "Você é um assessor jurídico analisando o resumo de um documento que contém uma petição ou decisão judicial."
+            "Utilize o resumo para responder às perguntas. "
             "Seja conciso nas respostas, entregando apenas as informações solicitadas"
-            "Contexto: {context}"
+            "Resumo: {context}"
             )
 
-        #prompt do chat
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", system_prompt),
-                ("human", "{input}"),
-            ]
-        )
+    #prompt do chat
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("human", "{input}"),
+        ]
+    )
     
     #cria uma chain de perguntas e respostas
     question_answer_chain = create_stuff_documents_chain(llm, prompt)
@@ -53,7 +45,7 @@ def AnaliseHonorarios(docsearch, model="gpt-3.5-turbo", Verbose=False):
     #cria uma chain de retrieval para realizar as perguntas e respostas
     chain = create_retrieval_chain(docsearch.as_retriever(), question_answer_chain)
     
-    if model == "gpt-4" or model == "gpt-4o":
+    if not Resumo:
         q1 = """
         Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
 
@@ -66,9 +58,9 @@ def AnaliseHonorarios(docsearch, model="gpt-3.5-turbo", Verbose=False):
         Revise o documento e responda apenas 'Sim' ou 'Não', especificando se houve uma condenação do Estado do Ceará ao pagamento de honorários advocatícios.
 
         """
-    elif model == "gpt-3.5-turbo":
+    else:
         q1 = """
-        Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
+        Você é um assessor jurídico analisando o resumo de um documento que contém uma petição ou decisão judicial.
 
         Seu objetivo é verificar se o Estado do Ceará foi condenado ao pagamento de honorários advocatícios, também chamados de honorários sucumbenciais. 
         
@@ -76,7 +68,7 @@ def AnaliseHonorarios(docsearch, model="gpt-3.5-turbo", Verbose=False):
         
         As condenações podem variar em forma e valor, por vezes fixados em percentual sobre o valor da causa, em valores absolutos ou determinados por equidade.
 
-        Revise o documento e responda apenas 'Sim' ou 'Não', especificando se houve uma condenação do Estado do Ceará ao pagamento de honorários advocatícios.
+        Responda apenas 'Sim' ou 'Não', especificando se houve uma condenação do Estado do Ceará ao pagamento de honorários advocatícios.
 
         """
         
@@ -87,6 +79,9 @@ def AnaliseHonorarios(docsearch, model="gpt-3.5-turbo", Verbose=False):
 
     # Interpreta a resposta como 'Sim' ou 'Não' e converte para booleano
     possui_indenizacao = True if resposta.strip().lower().startswith('sim') else False
+    
+    if Verbose:
+        print(f'=> Detectou condenação por honorário: {possui_indenizacao}')
 
     # Retorna o resultado encapsulado no modelo Pydantic
     return (possui_indenizacao, cost)

@@ -29,11 +29,11 @@ class Medicamentos(BaseModel):
 
 #Recebe uma retrieval chain de uma sentença e retorna uma lista de medicamentos presentes
 # pares (medicamento, dosagem_em_mg)
-def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False):
+def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=True):
 
-
-    if model == "gpt-4" or model == "gpt-4o":
-        llm = ChatOpenAI(model_name="gpt-4", temperature=0)
+    #caso seja a análise de um documento, e não do seu resumo
+    if not Resumo: 
+        llm = ChatOpenAI(model_name=model, temperature=0)
         #prompt do robô - context vai ser preenchido pela retrieval dos documentos
         system_prompt = (
             "Você é um assessor jurídico analisando documentos jurídicos que podem conter petições, decisões ou sentenças de fornecimento de itens de saúde, tais como medicamentos."
@@ -43,15 +43,16 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False):
             "Seja conciso nas respostas."
             "Contexto: {context}"
         )
-    elif model == "gpt-3.5-turbo":
-        
-        llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+    #caso seja a análise de um resumo de documento
+    else: 
+        llm = ChatOpenAI(model_name=model, temperature=0)
         system_prompt = (
-        "Você é um assessor jurídico analisando um documento que contém uma decisão judicial."
-        "Utilize o contexto para responder às perguntas. "
+        "Você é um assessor jurídico analisando o resumo de um documento que contém uma petição ou decisão judicial."
+        "Utilize o resumo para responder às perguntas. "
         "Seja conciso nas respostas, entregando apenas as informações solicitadas"
-        "Contexto: {context}"
+        "Resumo: {context}"
         )
+
 
     #prompt do chat
     prompt = ChatPromptTemplate.from_messages(
@@ -71,7 +72,7 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False):
     lm = [] #lista de medicamentos
     cost = 0
 
-    if model == "gpt-4" or model == "gpt-4o":
+    if not Resumo:
         #Aqui o objetivo dos prompts é listar os itens que são medicamentos
         q1 = """
             Você é um assessor jurídico analisando um documento que contém uma petições ou decisão judicial.
@@ -86,17 +87,13 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False):
             
             Em hipótese alguma forneça na lista medicamentos que não estavam na decisão. Se não houverem medicamentos, apenas responda que não há medicamentos.
         """
-    elif model == "gpt-3.5-turbo":
+    else:
         q1 = """
-        Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
-    
-        Considere como medicamentos apenas substâncias ou compostos farmacêuticos usados exclusivamente para tratar, prevenir ou curar doenças. 
-    
-        Outros itens médicos ou de assistência, como fraldas, seringas, luvas, oxímetro, leitos hospitalares ou termômetros não são medicamentos
+        Você é um assessor jurídico analisando o resumo de um documento que contém uma petição ou decisão judicial.
+            
+        Sua tarefa é verificar se são listados medicamentos no resumo do documento, trazendo todas as informações sobre estes, tais como nomes, dosagem, quantidade e duração do tratamento.
         
-        Sua tarefa é fornecer uma lista contendo apenas os itens que são medicamentos na decisão judicial e a dosagem em miligramas(MG).
-        
-        Em hipótese alguma forneça na lista medicamentos que não estavam na decisão. Se não houverem medicamentos, apenas responda que não há medicamentos.
+        Em hipótese alguma forneça na lista medicamentos que não estavam no resumo do documento. Se não houverem medicamentos, apenas responda que não há medicamentos.
         """
     
     with get_openai_callback() as c1:
@@ -104,7 +101,7 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False):
         cost += c1.total_cost
 
     if Verbose:
-        print(f"Medicamentos presentes no documento judicial: {r1}")
+        print(f"=> Medicamentos presentes no documento judicial: {r1}")
     
     parser = JsonOutputParser(pydantic_object=Medicamentos)
 
@@ -121,7 +118,7 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False):
         cost += c2.total_cost
 
     if Verbose:
-        print(f"Medicamentos extraidos do documento judicial: {lm}")  
+        print(f"=> Medicamentos extraidos do documento judicial: {lm}")  
     
     r = []
     
@@ -134,7 +131,7 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False):
         r.append((med['nome'], med['dose']))
     
     if Verbose:
-        print(f"Medicamentos já dentro da estrutura: {r}") 
+        print(f"=> Medicamentos já dentro da estrutura: {r}") 
  
     return (r, cost)
 
