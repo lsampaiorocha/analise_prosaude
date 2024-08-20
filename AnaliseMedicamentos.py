@@ -22,12 +22,16 @@ from dotenv import load_dotenv
 class Medicamento(BaseModel):
     nome: str = Field(default="N/A",description="Nome do medicamento")
     dose: int = Field(default=0,description="Dose do medicamento em miligramas")
+    quantidade: int = Field(default=0,description="Quantidade por mês")
+    duracao: int = Field(default=0,description="Duração em meses")
 
-class Medicamentos(BaseModel):
-    meds: list[Medicamento] = Field(description="Lista de medicamentos com suas respectivas doses")
+#class Medicamentos(BaseModel):
+#    meds: list[Medicamento] = Field(description="Lista de medicamentos com suas respectivas doses")
     
+class Medicamentos(BaseModel):
+    meds: list[Medicamento] = Field(description="Lista de medicamentos com seus nomes, dose, quantidade de caixas por mês, e duração do tratamento")
 
-#Recebe uma retrieval chain de uma sentença e retorna uma lista de medicamentos presentes
+#Recebe uma retrieval chain e retorna uma lista de medicamentos presentes
 # pares (medicamento, dosagem_em_mg)
 def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=True):
 
@@ -37,7 +41,7 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=
         #prompt do robô - context vai ser preenchido pela retrieval dos documentos
         system_prompt = (
             "Você é um assessor jurídico analisando documentos jurídicos que podem conter petições, decisões ou sentenças de fornecimento de itens de saúde, tais como medicamentos."
-            "Sua tarefa consiste em extrair dos documentos os nomes e as dosagens de medicamentos, caso possua."
+            "Sua tarefa consiste em extrair dos documentos os nomes, dose, quantidade e duração do tratamento, quando estiverem presentes."
             "Considere como medicamentos apenas substâncias ou compostos farmacêuticos usados exclusivamente para tratar, prevenir ou curar doenças. "
             "Utilize o contexto para responder às perguntas."
             "Seja conciso nas respostas."
@@ -70,7 +74,7 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=
 
 
     lm = [] #lista de medicamentos
-    cost = 0
+    #cost = 0
 
     if not Resumo:
         #Aqui o objetivo dos prompts é listar os itens que são medicamentos
@@ -81,9 +85,9 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=
         
             Outros itens médicos ou de assistência, como fraldas, seringas, luvas, oxímetro, leitos hospitalares ou termômetros não são medicamentos
             
-            Sua tarefa é fornecer uma lista contendo apenas os itens que são medicamentos na decisão judicial e a dosagem em miligramas(MG).
-            
-            Nunca calcule a dosagem total, o que interessa é a dosagem para cada caixa de medicamento.
+            Sua tarefa é fornecer uma lista contendo apenas os itens que são medicamentos na decisão judicial, com os seus nomes, doses, quantidade por mês e duração do tratamento em meses, na medida em que estiverem presentes.
+                        
+            Nunca calcule a dose total, o que interessa é a dose para cada caixa de medicamento.
             
             Em hipótese alguma forneça na lista medicamentos que não estavam na decisão. Se não houverem medicamentos, apenas responda que não há medicamentos.
         """
@@ -91,14 +95,16 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=
         q1 = """
         Você é um assessor jurídico analisando o resumo de um documento que contém uma petição ou decisão judicial.
             
-        Sua tarefa é verificar se são listados medicamentos no resumo do documento, trazendo todas as informações sobre estes, tais como nomes, dosagem, quantidade e duração do tratamento.
+        Sua tarefa é verificar se são listados medicamentos no resumo do documento, trazendo todas as informações sobre estes, tais como nomes, dose, quantidade por mês e duração em meses do tratamento.
         
         Em hipótese alguma forneça na lista medicamentos que não estavam no resumo do documento. Se não houverem medicamentos, apenas responda que não há medicamentos.
         """
     
     with get_openai_callback() as c1:
         r1 = chain.invoke({"input": q1}).get('answer')
-        cost += c1.total_cost
+        #cost += c1.total_cost
+
+    cost1 = (c1.prompt_tokens, c1.completion_tokens)
 
     if Verbose:
         print(f"=> Medicamentos presentes no documento judicial: {r1}")
@@ -106,7 +112,7 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=
     parser = JsonOutputParser(pydantic_object=Medicamentos)
 
     prompt = PromptTemplate(
-        template="Forneça apenas a lista com os nomes dos medicamentos e o valor da dosagem em miligramas (MG).\n{format_instructions}\n{query}\n",
+        template="Forneça apenas a lista com nomes dos medicamentos, valor da dose em miligramas (MG), quantidade por mês e duração do tratamento em meses.\n{format_instructions}\n{query}\n",
         input_variables=["query"],
         partial_variables={"format_instructions": parser.get_format_instructions()},
     )
@@ -115,7 +121,9 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=
     
     with get_openai_callback() as c2:
         lm = chain2.invoke({"query": r1}).get("meds")
-        cost += c2.total_cost
+        #cost += c2.total_cost
+
+    cost2 = (c2.prompt_tokens, c2.completion_tokens)
 
     if Verbose:
         print(f"=> Medicamentos extraidos do documento judicial: {lm}")  
@@ -124,14 +132,28 @@ def AnaliseMedicamentos(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=
     
     #previne algumas situações chatas em que não é retornado no formato previsto
     for med in lm:
+        """
         if 'dose' not in med:
-            med['dose'] = 0 
+            med['dose'] = 0
+        if 'quantidade' not in med:
+            med['quantidade'] = 0
+        if 'duracao' not in med:
+            med['duracao'] = 0 
         if 'nome' not in med:
             med['nome'] = ""
-        r.append((med['nome'], med['dose']))
+        """
+    
+        med.setdefault('dose', 0)
+        med.setdefault('quantidade', 0)
+        med.setdefault('duracao', 0)
+        med.setdefault('nome', "")
+        r.append((med['nome'], med['dose'], med['quantidade'], med['duracao']))
     
     if Verbose:
-        print(f"=> Medicamentos já dentro da estrutura: {r}") 
+        print(f"=> Medicamentos no formato estruturado: {r}") 
+        
+    #calcula os tokens das duas chamadas
+    cost = (cost1[0] + cost2[0], cost1[1] + cost2[1])
  
     return (r, cost)
 

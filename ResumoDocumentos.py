@@ -10,22 +10,57 @@ from langchain.prompts import PromptTemplate
 #from AnalisePortaria import CustoGpt4o
 
 
-def CustoGpt4o(prompt_tokens, completion_tokens):
-    # Custos durante o horário de pico
-    custo_input = 5.00 / 1_000_000
-    custo_output = 15.00 / 1_000_000
-    
-    # Calculando o custo
-    custo_pico = (prompt_tokens * custo_input) + (completion_tokens * custo_output)
-    
-    return custo_pico
-
 
 def GeraResumo(pages, model, api_key, Verbose=False):
   openai.api_key = api_key
     
   try:
     
+    prompt_template = """
+        Você é um assessor jurídico e precisa resumir o conteúdo de um documento solicitando ou obrigando a fornecer itens e/ou serviços da área médica. 
+    O resumo deve ser escrito em português do Brasil e deve conter as seguintes informações:
+
+        **Resumo do Documento**
+
+        - **Tipo de Documento:** Indique se é uma Sentença, Decisão Interlocutória ou Petição Inicial
+        - **Valor da Causa:** Informe o valor da causa
+        - **Itens a serem fornecidos:**
+          - **Medicamentos:**
+            - Liste os medicamentos com suas dosagens e quantidades
+          - **Serviços:**
+            - Liste os serviços necessários
+        - **Dosagem, Quantidade e Duração do Tratamento:**
+          - Detalhe as dosagens, quantidades e duração do tratamento para cada medicamento
+        - **Internação ou Transferência para UTI/UCE:** Informe se há solicitação ou obrigação de internação ou transferência para UTI ou UCE.
+        - **Danos Morais:** Informe se há solicitação ou condenação por danos morais.
+        - **Honorários:** Detalhe se há condenação por honorários, especificando quem foi condenado e o valor.
+        - **Multa ou Bloqueio de Recursos:** Detalhe se há condenação por multa ou bloqueio de recursos, especificando o valor.
+        - **Pedido de Liminar ou Antecipação de Tutela:** Informe se há pedido de liminar ou antecipação de tutela.
+        - **Deferimento ou Indeferimento do pedido liminar ou antecipação de tutela:** Informe se foi deferido, indeferido ou não se aplica.
+
+        **Detalhes Adicionais:**
+        - **Requerente:** Informe o nome do requerente e, se for o caso, quem ele representa.
+        - **Requeridos:** Liste os requeridos.
+        - **Fundamentação:** Resuma em poucas linhas do que trata o documento.
+
+        "{text}"
+        Resumo do texto:"""
+    
+    '''
+    prompt_template = """Você é um assessor jurídico e precisa resumir o conteúdo de um documento solicitando ou obrigando a fornecer itens e/ou serviços da área médica. 
+    O resumo deve ser escrito em português do Brasil e deve conter as seguintes informações:
+    - Se é uma Sentença, Decisão interlocutória ou Petição Inicial (documento inicial da ação)
+    - Valor da Causa
+    - Lista completa dos itens a serem fornecidos, com suas especificações tais como nomes completos e quantidades
+    - Se houverem medicamentos, os nomes, dosagem, quantidade e duração do tratamento
+    - Se contém solicitação ou obrigação de internação ou transferência para Unidade de Terapia Intensiva (UTI) ou Unidade de Cuidados Especiais (UCE)
+    - Se há solicitação ou condenação por danos morais
+    - Se há condenação por honorários, dizendo quem foi condenado e em que valor
+    - Se há condenação por multa ou bloqueio de recursos e em que valor
+    "{text}"
+    Resumo do texto:"""
+    '''
+    '''
     prompt_template = """Você é um assessor jurídico e precisa resumir o conteúdo de um documento solicitando ou obrigando a fornecer itens e/ou serviços da área médica. 
     O resumo deve ser escrito em português do Brasil e deve conter as seguintes informações:
     - Valor da Causa
@@ -34,10 +69,12 @@ def GeraResumo(pages, model, api_key, Verbose=False):
     - Se contém solicitação ou obrigação de internação ou transferência para Unidade de Terapia Intensiva (UTI) ou Unidade de Cuidados Especiais (UCE)
     - Se é solicitada indenização por danos morais
     - Se há condenação por danos morais
-    - Se há condenação por honorários e em que valor
+    - Se há condenação por honorários, dizendo quem foi condenado e em que valor
     - Se há condenação por multa ou bloqueio de recursos e em que valor
     "{text}"
     Resumo do texto:"""
+    '''
+    
     
     prompt = PromptTemplate.from_template(prompt_template)
     
@@ -55,7 +92,8 @@ def GeraResumo(pages, model, api_key, Verbose=False):
     
     resumo = r1.get('output_text')
     
-    cost = CustoGpt4o(c1.prompt_tokens, c1.completion_tokens)
+    #cost = CustoGpt4o(c1.prompt_tokens, c1.completion_tokens)
+    cost = (c1.prompt_tokens, c1.completion_tokens)
     
     if Verbose:
       print(f'=> Resumo do documento:{resumo}')
@@ -67,5 +105,5 @@ def GeraResumo(pages, model, api_key, Verbose=False):
   except Exception as e:
       print(f"Erro durante chamada da API para resumo: {e}")
       return ""
-
+    
 

@@ -58,7 +58,7 @@ def DetectaOutrosLLM(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=Tru
     #cria uma chain de retrieval para realizar as perguntas e respostas
     chain = create_retrieval_chain(docsearch.as_retriever(), question_answer_chain)
 
-    cost = 0
+    #cost = 0
 
     if not Resumo:
         #Aqui o objetivo dos prompts é listar os itens que não são medicamentos
@@ -80,7 +80,9 @@ def DetectaOutrosLLM(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=Tru
         
     with get_openai_callback() as c1:
         r1 = chain.invoke({"input": q1}).get('answer')
-        cost += c1.total_cost
+        #cost += c1.total_cost
+        
+    cost = (c1.prompt_tokens, c1.completion_tokens)
 
     if Verbose:
         print(f"Outros itens foram detectados por LLM: {r1}")  
@@ -98,12 +100,25 @@ def AnaliseOutrosRegex(pages, Verbose=False):
     #palavras que tiveram que ser retiradas: procedimento, consulta, tratamento
     # Definindo palavras-chave importantes - OBS: Errar por excesso não é problema, o problema maior é não detectar
     # Estas são as palavras chaves
+    """
     palavras_filtro_permitidos = ['aliment', 'enteral', 'dieta', 'Energy','sonda','frasco','fralda', 'álcool', 'atadura', 'tubo',
                        'gase', 'luvas', 'esparadrapo', 'algodão', 'colchão', 'UTI ', 'terapia intensiva', 'UCE', 'cuidados especiais', 
                        'seringa', 'aspirador', 'terapia', 'exame', 'consulta médica', 'internação', 'sessão de laser', 'sessão de fisio', 
                        'atendimento com médico', 'equipo', 'suplementação alimentar', 'compostos alimentares','sensor de glicose', 
                        'insulina', 'fonoaudiólogo', 'fisioterapia', 'CPAP', 'aparelho', 'BIPAP', 'umidificador', 'mascara', 
                        'psicopedagógico', 'psicólogo', 'psiquiatr', 'agulha']
+    
+    
+    #versão ajustada para uso com resumos e também por haver o detector de internação
+    palavras_filtro_permitidos = ['sonda','frasco','fralda', 'álcool', 'atadura', 'tubo',
+                       'gase', 'luvas', 'esparadrapo', 'algodão', 'colchão','seringa', 'aspirador', 
+                       'equipo', 'sensor de glicose', 'insulina',  'umidificador', 'mascara', 'agulha']
+    """
+    
+    palavras_filtro_permitidos = [ 'insulina', 'frasco', 'procedimento', 'consulta', 'exame', 'psicólogo', 'psiquiatr',
+                                  'tratamento', 'sessão de ',
+                                  'fonoaudiólogo', 'fisioterapia', 'atendimento', 
+                                  ]
     
     
     # Aplicando a função de normalização para lidar com acentos e assegurar espaço em branco no início
@@ -149,7 +164,20 @@ def AnaliseOutrosRegex(pages, Verbose=False):
     #palavras que tiveram que ser retiradas: procedimento, consulta, tratamento
     # Definindo palavras-chave importantes - OBS: Errar por excesso não é problema, o problema maior é não detectar
     # Estas são as palavras chaves
+    """
     palavras_filtro_proibidas = ['cama', 'procedimento cirúrgico', 'cirurgia', 'cadeira de roda', 'tratamento cirúrgico']
+    
+    palavras_filtro_proibidas = ['aliment', 'enteral', 'dieta', 'Energy', 'cama', 'procedimento cirúrgico', 
+                                 'cirurgia', 'cadeira de roda', 'tratamento cirúrgico', 'exame', 'consulta médica',
+                                 'sessão de laser', 'sessão de fisio', 'atendimento com médico',
+                                 'suplementação alimentar', 'compostos alimentares', 'fonoaudiólogo', 'fisioterapia', 'CPAP', 
+                                 'aparelho', 'BIPAP','psicopedagógico', 'psicólogo', 'psiquiatr',]
+    """
+    palavras_filtro_proibidas = ['hidratante', 'umidificador', 'mascara', 'agulha', 'sonda','frasco','fralda', 'álcool', 'atadura', 
+                                 'tubo', 'gase', 'luvas', 'esparadrapo', 'algodão', 'colchão','seringa', 'aspirador', 
+                                 'equipo', 'sensor','aliment', 'enteral', 'dieta', 'Energy', 'cama',  
+                                 'cirurgia', 'cadeira de roda', 'suplementação alimentar', 'compostos alimentares', 
+                                 'CPAP', 'aparelho', 'BIPAP','psicopedagógico']
     
     # Aplicando a função de normalização para lidar com acentos e assegurar espaço em branco no início
     #regex_patterns = [r'\b' + normalize_regex(re.escape(keyword)).replace(r'\ ', r'\s+') + r'\b' for keyword in palavras_filtro]

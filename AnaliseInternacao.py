@@ -7,10 +7,11 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 
 
-#Recebe uma retrieval chain de uma sentença e retorna uma lista de medicamentos presentes
+#Recebe uma retrieval chain e verificar se existe algum pedido de internação
 # pares (medicamento, dosagem_em_mg)
 def AnaliseInternacao(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=True):
 
+    #cost = 0
 
     if not Resumo:
         llm = ChatOpenAI(model_name="gpt-4", temperature=0)
@@ -71,10 +72,15 @@ def AnaliseInternacao(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=Tr
     with get_openai_callback() as c1:
         # Invoca a cadeia de análise com o prompt fornecido
         resposta = chain.invoke({"input": q1}).get('answer')
-        cost += c1.total_cost
+        #cost += c1.total_cost
+        
+    cost = (c1.prompt_tokens, c1.completion_tokens)
 
     # Interpreta a resposta como 'Sim' ou 'Não' e converte para booleano
     possui_internacao = True if resposta.strip().lower().startswith('sim') else False
+
+    if Verbose:
+        print(f'=> Detectou Internação: {possui_internacao}')
 
     # Retorna o resultado encapsulado no modelo Pydantic
     return (possui_internacao, cost)

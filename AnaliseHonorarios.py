@@ -8,7 +8,7 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 #Recebe uma retrieval chain de uma sentença e retorna Sim ou não se houve condenação do estado do ceará ao pagamento de honorários
 def AnaliseHonorarios(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=True):
     
-    cost = 0
+    #cost = 0
 
     #caso seja análise de um documento, e não do seu resumo
     if not Resumo:
@@ -75,8 +75,10 @@ def AnaliseHonorarios(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=Tr
     with get_openai_callback() as c1:
         # Invoca a cadeia de análise com o prompt fornecido
         resposta = chain.invoke({"input": q1}).get('answer')
-        cost += c1.total_cost
+        #cost += c1.total_cost
 
+    cost = (c1.prompt_tokens, c1.completion_tokens)
+    
     # Interpreta a resposta como 'Sim' ou 'Não' e converte para booleano
     possui_indenizacao = True if resposta.strip().lower().startswith('sim') else False
     

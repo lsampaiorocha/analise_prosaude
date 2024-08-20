@@ -115,7 +115,8 @@ def RoboGoogleAnvisa(lista_medicamentos):
     # Lista para armazenar os resultados
     results = list()
     # Loop através dos medicamentos
-    for medication_name, dosagem in lista_medicamentos:
+    # TODO levar em consideração a dose
+    for medication_name, dose, qtd, duracao in lista_medicamentos:
         # Verificar se a entrada não está vazia
         if medication_name.strip():  # Verifica se a string não está vazia após remoção dos espaços em branco
            
