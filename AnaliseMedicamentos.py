@@ -15,10 +15,6 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 
 from dotenv import load_dotenv
 
-import fitz  
-import pandas as pd
-import openpyxl
-
 
 # Define your desired data structure.
 #class Meds(BaseModel):
@@ -180,13 +176,3 @@ def VerificaTeto(lm):
         
         
     return (res, total)
-
-
-def check_rename(pdf_path, princ_ativo):
-    rename = fitz.open(pdf_path)
-    for num_pag in range(len(rename)):
-        pag = rename.load_page(num_pag)
-        rename_txt = pag.get_text()
-        if princ_ativo in rename_txt:
-            return True
-    return False

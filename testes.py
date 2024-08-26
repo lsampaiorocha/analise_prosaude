@@ -41,16 +41,15 @@ import os
 import re
 
 from AnalisePortaria import *
+from AnaliseGeral import *
 
-
-import pdb
 
 from openpyxl import Workbook
 
 #Roda uma bateria de testes a partir dos nomes de arquivos presentes na coleção dourada
-def roda_teste(models, Verbose=False, MedRobot=False, Seleciona=False, ArqSeleciona=None):
+def roda_teste(models, Verbose=False, MedRobot=False):
     # Caminho para o arquivo Excel
-    caminho_dourada = os.path.join(os.getcwd(), "inputs", 'Colecao_dourada_decisoes.xlsx')
+    caminho_dourada = os.path.join(os.getcwd(), "inputs", 'Colecao_dourada_peticoes_iniciais.xlsx')
     
     df = pd.read_excel(caminho_dourada)
     lista_arquivos = df['nome do arquivo'].tolist()
@@ -60,194 +59,155 @@ def roda_teste(models, Verbose=False, MedRobot=False, Seleciona=False, ArqSeleci
     resultados = []
     
     resultado = None
+    
+    nome_arquivo_saida = "teste_dourada_peticoes_1.xlsx"
             
 
-    if not Seleciona:
-        # Loop através dos arquivos filtrados
-        workbook = Workbook()
-        sheet = workbook.active
-        sheet.append(['Nome do Arquivo',
-                      'Possui Outros Além de Medicamentos',
-                      'Condenação Honorários Sucumbenciais (acima de 1500)',
-                      'Possui medicamentos',
-                      'Deveria aplicar a Portaria',
-                      'Resultado Outros',
-                      'Resultado Condenação',
-                      'Resultado medicamentos',
-                      'Resultado Teto',
-                      'Resultado aplicação portaria',
-                      'VP_outros',
-                      'FN_outros',
-                      'FP_outros',
-                      'VN_outros',
-                      'VP_honorarios',
-                      'FN_honorarios',
-                      'FP_honorarios',
-                      'VN_honorarios',
-                      'VP_medicamentos',
-                      'FN_medicamentos',
-                      'FP_medicamentos',
-                      'VN_medicamentos',
-                      'VP_portaria',
-                      'FN_portaria',
-                      'FP_portaria',
-                      'VN_portaria', 
-                      'Custo', 
-                      'Lista de medicamentos', 
-                      'Lista de Outros'])
-        workbook.save('teste_dourada_decisoes_1.xlsx')
-        for nome_arquivo in lista_arquivos:
-            print(f"Iniciando análise de {nome_arquivo}...")
-            linha = df[df['nome do arquivo'] == nome_arquivo].iloc[0]
-            possui_outros = str(linha['Possui outros alem de medicamentos (SIM/NÃO)'])
-            condenacao = str(linha['Condenação honorários sucumbenciais (acima de 1500) (SIM/NÃO)'])
-            medicamentos=str(linha['Possui medicamentos (SIM/NÃO)'])
-            #MODIFICADO (Leonardo)
-            portaria=str(linha['Aplica-se a portaria considerando o inciso I? (SIM/NÃO)'])
-            
-            possui_outros = True if possui_outros.strip().lower().startswith('sim') else False
-            condenacao = True if condenacao.strip().lower().startswith('sim') else False
-            medicamentos =  True if medicamentos.strip().lower().startswith('sim') else False
-            #MODIFICADO (Leonardo)
-            portaria = True if portaria.strip().lower().startswith('sim') else False
-            
-            # Supondo que as funções verifica_condenacao e verifica_outros já estão definidas
-            caminho_completo = os.path.join(os.getcwd(), "uploads", nome_arquivo)
-            #pdb.set_trace()
-            resultado = AnalisePortaria(caminho_completo, models, TipoDocumento="Decisão", MedRobot=MedRobot, Verbose=Verbose)
-            #resultado = AnalisePortaria(caminho_completo, Robot, Verbose)
-            if resultado == None:
-                print(f"...Erro")
-                continue
-                
-            resultado_condenacao = resultado['condenacao_honorarios']
-            
-            resultado_outros = resultado['possui_outros']
-            
-            resultado_medicamentos = False if not resultado['lista_medicamentos'] else True
-
-            #resultado_portaria = resultado_medicamentos and not resultado_condenacao and not resultado_outros
-            #MODIFICADO (Leonardo)
-            resultado_teto = resultado['respeita_valor_teto']
-            
-            #ATENCAO: MODIFICAR PARA MODIFICAR APLICACAO DA PORTARIA
-            resultado_portaria = resultado_medicamentos and resultado_teto and not resultado_condenacao and not resultado_outros
-            
-            resultados.append({
-                'Nome do Arquivo': nome_arquivo,
-                'Possui Outros Além de Medicamentos': possui_outros,
-                'Condenação Honorários Sucumbenciais (acima de 1500)': condenacao,
-                'Possui medicamentos': medicamentos,
-                'Deveria aplicar a Portaria': portaria,
-                'Resultado Outros': resultado_outros,
-                'Resultado Condenação': resultado_condenacao,
-                'Resultado medicamentos': resultado_medicamentos,
-                'Resultado Teto': resultado_teto,
-                'Resultado aplicação portaria': resultado_portaria,
-                'VP_outros': possui_outros and resultado_outros,  # Verdadeiro Positivo: ambos True
-                'FN_outros': possui_outros and not resultado_outros,  # Falso Negativo: possui_outros True, resultado_outros False
-                'FP_outros': not possui_outros and resultado_outros,  # Falso Positivo: possui_outros False, resultado_outros True
-                'VN_outros': not possui_outros and not resultado_outros,  # Verdadeiro Negativo: ambos False
-                'VP_honorarios': condenacao and resultado_condenacao,  # Verdadeiro Positivo: ambos True
-                'FN_honorarios': condenacao and not resultado_condenacao,  # Falso Negativo: possui_outros True, resultado_outros False
-                'FP_honorarios': not condenacao and resultado_condenacao,  # Falso Positivo: possui_outros False, resultado_outros True
-                'VN_honorarios': not condenacao and not resultado_condenacao,  # Verdadeiro Negativo: ambos False
-                'VP_medicamentos': medicamentos and resultado_medicamentos,  # Verdadeiro Positivo: ambos True
-                'FN_medicamentos': medicamentos and not resultado_medicamentos,  # Falso Negativo: possui_outros True, resultado_outros False
-                'FP_medicamentos': not medicamentos and resultado_medicamentos,  # Falso Positivo: possui_outros False, resultado_outros True
-                'VN_medicamentos': not medicamentos and not resultado_medicamentos,  # Verdadeiro Negativo: ambos False
-                'VP_portaria': portaria and resultado_portaria,  # Verdadeiro Positivo: ambos True
-                'FN_portaria': portaria and not resultado_portaria,  # Falso Negativo: possui_outros True, resultado_outros False
-                'FP_portaria': not portaria and resultado_portaria,  # Falso Positivo: possui_outros False, resultado_outros True
-                'VN_portaria': not portaria and not resultado_portaria,  # Verdadeiro Negativo: ambos False
-                'Custo': resultado['custollm'],
-                'Lista de medicamentos': str(resultado['lista_medicamentos']),
-                'Lista de Outros': str(resultado['lista_outros'])
-            })
-
-            print(f"...Sucesso")
-            workbook = openpyxl.load_workbook('teste_dourada_decisoes_1.xlsx')
-            sheet = workbook.active
-            sheet.append([nome_arquivo,
-                          possui_outros, 
-                          condenacao,  
-                          medicamentos, 
-                          portaria, 
-                          resultado_outros,
-                          resultado_condenacao,
-                          resultado_medicamentos,
-                          resultado_teto,
-                          resultado_portaria,
-                          possui_outros and resultado_outros,
-                          possui_outros and not resultado_outros,
-                          not possui_outros and resultado_outros,
-                          not possui_outros and not resultado_outros,
-                          condenacao and resultado_condenacao,
-                          condenacao and not resultado_condenacao,
-                          not condenacao and resultado_condenacao,
-                          not condenacao and not resultado_condenacao,
-                          medicamentos and resultado_medicamentos,
-                          medicamentos and not resultado_medicamentos,
-                          not medicamentos and resultado_medicamentos,
-                          not medicamentos and not resultado_medicamentos,
-                          portaria and resultado_portaria,
-                          portaria and not resultado_portaria,
-                          not portaria and resultado_portaria, 
-                          not portaria and not resultado_portaria, 
-                          resultado['custollm'], 
-                          str(resultado['lista_medicamentos']),
-                          str(resultado['lista_outros'])
-            ]) 
-            workbook.save('teste_dourada_decisoes_1.xlsx')
-    else:
-        nome_arquivo = ArqSeleciona
+    # Loop através dos arquivos filtrados
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(['Nome do Arquivo',
+                    'Tipo do documento',
+                    'Resumo do documento',
+                    'Possui Outros Além de Medicamentos',
+                    'Condenação Honorários Sucumbenciais (acima de 1500)',
+                    'Possui medicamentos',
+                    'Possui internação',
+                    'Deveria aplicar a Portaria',
+                    'Resultado Outros',
+                    'Resultado Outros Proibidos',
+                    'Resultado Condenação',
+                    'Resultado medicamentos',
+                    'Resultado internação',
+                    'Resultado Teto',
+                    'Resultado aplicação portaria',
+                    'VP_outros',
+                    'FN_outros',
+                    'FP_outros',
+                    'VN_outros',
+                    'VP_honorarios',
+                    'FN_honorarios',
+                    'FP_honorarios',
+                    'VN_honorarios',
+                    'VP_medicamentos',
+                    'FN_medicamentos',
+                    'FP_medicamentos',
+                    'VN_medicamentos',
+                    'VP_internacao',
+                    'FN_internacao',
+                    'FP_internacao',
+                    'VN_internacao',
+                    'VP_portaria',
+                    'FN_portaria',
+                    'FP_portaria',
+                    'VN_portaria', 
+                    'Custo',
+                    'Tokens', 
+                    'Lista de medicamentos', 
+                    'Lista de Outros'])
+    workbook.save(nome_arquivo_saida)
+    for nome_arquivo in lista_arquivos:
         print(f"Iniciando análise de {nome_arquivo}...")
         linha = df[df['nome do arquivo'] == nome_arquivo].iloc[0]
-        possui_outros = str(linha['Possui outros alem de medicamentos'])
-        condenacao = str(linha['Condenação honorários sucumbenciais (acima de 1500)'])
+        possui_outros = str(linha['Possui outros alem de medicamentos (SIM/NÃO)'])
+        condenacao = str(linha['Condenação honorários sucumbenciais (acima de 1500) (SIM/NÃO)'])
+        medicamentos=str(linha['Possui medicamentos (SIM/NÃO)'])
+        internacao=str(linha['Possui internacao (SIM/NÃO)'])
+        #MODIFICADO (Leonardo)
+        portaria=str(linha['Aplica-se a portaria considerando o inciso I? (SIM/NÃO)'])
         
         possui_outros = True if possui_outros.strip().lower().startswith('sim') else False
         condenacao = True if condenacao.strip().lower().startswith('sim') else False
-
+        medicamentos =  True if medicamentos.strip().lower().startswith('sim') else False
+        internacao =  True if internacao.strip().lower().startswith('sim') else False
+        #MODIFICADO (Leonardo)
+        portaria = True if portaria.strip().lower().startswith('sim') else False
+        
         # Supondo que as funções verifica_condenacao e verifica_outros já estão definidas
         caminho_completo = os.path.join(os.getcwd(), "uploads", nome_arquivo)
         #pdb.set_trace()
-        resultado = AnalisePortaria(caminho_completo, Robot, Verbose)
+        resultado = AnalisePortaria(caminho_completo, models, TipoDocumento="Indeterminado", MedRobot=MedRobot, Verbose=Verbose)
+        
         if resultado == None:
             print(f"...Erro")
+            continue
+        
+        tipo_documento = resultado['tipo_documento']
+        resultado_resumo = resultado['resumo']
             
         resultado_condenacao = resultado['condenacao_honorarios']
+        resultado_internacao = resultado['internacao']
+        
         
         resultado_outros = resultado['possui_outros']
+        resultado_outros_proibidos = resultado['possui_outros_proibidos']
+        
+        resultado_medicamentos = False if not resultado['lista_medicamentos'] else True
 
-        resultados.append({
-            'Nome do Arquivo': nome_arquivo,
-            'Possui Outros Além de Medicamentos': possui_outros,
-            'Condenação Honorários Sucumbenciais (acima de 1500)': condenacao,
-            'Resultado Outros': resultado_outros,
-            'Resultado Condenação': resultado_condenacao,
-            'VP_outros': possui_outros and resultado_outros,  # Verdadeiro Positivo: ambos True
-            'FN_outros': possui_outros and not resultado_outros,  # Falso Negativo: possui_outros True, resultado_outros False
-            'FP_outros': not possui_outros and resultado_outros,  # Falso Positivo: possui_outros False, resultado_outros True
-            'VN_outros': not possui_outros and not resultado_outros,  # Verdadeiro Negativo: ambos False
-            'VP_honorarios': condenacao and resultado_condenacao,  # Verdadeiro Positivo: ambos True
-            'FN_honorarios': condenacao and not resultado_condenacao,  # Falso Negativo: possui_outros True, resultado_outros False
-            'FP_honorarios': not condenacao and resultado_condenacao,  # Falso Positivo: possui_outros False, resultado_outros True
-            'VN_honorarios': not condenacao and not resultado_condenacao  # Verdadeiro Negativo: ambos False
-        })
-    
+        #MODIFICADO (Leonardo)
+        resultado_teto = resultado['respeita_valor_teto']
+        
+        #ATENCAO: MODIFICAR PARA MODIFICAR APLICACAO DA PORTARIA
+        #resultado_portaria = (resultado_medicamentos or resultado_internacao) and resultado_teto and not resultado_condenacao and not resultado_outros_proibidos
+        #caso das petições
+        resultado_portaria = (resultado_medicamentos or resultado_internacao) and resultado_teto and not resultado_outros_proibidos
+        
+
         print(f"...Sucesso")
-     
-    if not Seleciona:    
-        # Converter a lista de resultados em um DataFrame e salvar em um arquivo Excel
-        resultados_df = pd.DataFrame(resultados)
-        # Suponha que 'resultados_df' é o DataFrame que você quer salvar
-        resultados_df.to_excel('testes_dourada.xlsx', index=False, engine='openpyxl')
+        #workbook = openpyxl.load_workbook('teste_dourada_decisoes_e_sentencas_1.xlsx')
+        #sheet = workbook.active
+        sheet.append([nome_arquivo,
+                        tipo_documento,
+                        resultado_resumo,
+                        possui_outros,
+                        condenacao,  
+                        medicamentos, 
+                        internacao,
+                        portaria, 
+                        resultado_outros,
+                        resultado_outros_proibidos,
+                        resultado_condenacao,
+                        resultado_medicamentos,
+                        resultado_internacao,
+                        resultado_teto,
+                        resultado_portaria,
+                        possui_outros and resultado_outros,
+                        possui_outros and not resultado_outros,
+                        not possui_outros and resultado_outros,
+                        not possui_outros and not resultado_outros,
+                        condenacao and resultado_condenacao,
+                        condenacao and not resultado_condenacao,
+                        not condenacao and resultado_condenacao,
+                        not condenacao and not resultado_condenacao,
+                        medicamentos and resultado_medicamentos,
+                        medicamentos and not resultado_medicamentos,
+                        not medicamentos and resultado_medicamentos,
+                        not medicamentos and not resultado_medicamentos,
+                        internacao and resultado_internacao,
+                        internacao and not resultado_internacao,
+                        not internacao and resultado_internacao,
+                        not internacao and not resultado_internacao,
+                        portaria and resultado_portaria,
+                        portaria and not resultado_portaria,
+                        not portaria and resultado_portaria, 
+                        not portaria and not resultado_portaria, 
+                        resultado['custollm'],
+                        str(resultado['tokensllm']), 
+                        str(resultado['lista_medicamentos']),
+                        str(resultado['lista_outros'])
+        ]) 
+        workbook.save(nome_arquivo_saida)
+
+  
+    # Converter a lista de resultados em um DataFrame e salvar em um arquivo Excel
+    #resultados_df = pd.DataFrame(resultados)
+    # Suponha que 'resultados_df' é o DataFrame que você quer salvar
+    #resultados_df.to_excel('testes_dourada.xlsx', index=False, engine='openpyxl')
 
 
 
 #Roda testes em módulos específicos, configurados a partir do dicionário modulos
-def teste_unitario(caminho, models, modulos, Verbose=False, MedRobot=False, Mode="Sentença"):
+def teste_unitario(caminho, models, modulos, Verbose=False, MedRobot=False, TipoDocumento="Sentença", Resumo=True):
     
     if Verbose:
         print("Modo verbose ativado.")    
@@ -255,8 +215,8 @@ def teste_unitario(caminho, models, modulos, Verbose=False, MedRobot=False, Mode
             print("MedRobot está ativado.")
             
     #realiza o preprocessamento das paginas do pdf
-    filtered_pages = preprocessamento(caminho, models, Verbose, Mode)
-  
+    (filtered_pages, custo) = preprocessamento(caminho, models, Verbose, TipoDocumento, Resumo=Resumo)
+    
     try:
         if Verbose:    
             print(f"Número de páginas após pré-processamento: {len(filtered_pages)}\n")
@@ -264,12 +224,31 @@ def teste_unitario(caminho, models, modulos, Verbose=False, MedRobot=False, Mode
             #    print(f"Página {page.metadata['page']}")
             #    print(f"Página {page.page_content}")
 
+        
+        #print("Que foi doido1")
+        
         # cria ids para as páginas, o que vai ser útil para gerenciar o banco de dados de vetores
         ids = [str(i) for i in range(1, len(filtered_pages) + 1)]
 
+
+        #print("Que foi doido2")
+        
         #utiliza embeddings da OpenAI para o banco de vetores Chroma
         embeddings = OpenAIEmbeddings()
         docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024}) #essa opção "hnsw:M": 1024 é importante para não ter problemas
+
+        #print("Que foi doido3")
+        
+        if modulos['geral']:
+            #analisa se existe condenação por honorários na sentença
+            (resposta, cgeral) = AnaliseGeral(docsearch, model=models['geral'], Verbose=Verbose, Resumo=Resumo)
+                     
+            #print(f"Usando {models['honorarios']} detecção de cond. honorários:{honor}")
+        
+            #if Verbose:
+            #print(f"Resultado Detecção de outros: {outrosllm}")
+            #print(f"Custo Detecção de honorários usando {models['honorarios']}: {chonor}")
+
 
         #Testa o modulo de detecção de extração de outros itens na sentença
         if modulos['outros']:            
@@ -330,6 +309,15 @@ def teste_unitario(caminho, models, modulos, Verbose=False, MedRobot=False, Mode
             print(f"Custo Detecção de itens alimentares usando {models['alimentares']}: {calim}")
             
             
+        if modulos['internação']:
+            #detecta (usando LLM) se existem outros itens além de medicamentos na sentença
+            (alim, calim) = AnaliseAlimentares(docsearch, model=models['alimentares'], Verbose=Verbose)
+            
+            print(f"Usando {models['alimentares']} detecção de itens alimentares:{alim}")
+        
+            print(f"Custo Detecção de itens alimentares usando {models['alimentares']}: {calim}")
+            
+            
         #Testa o modulo de detecção de extração de outros itens na sentença
         if modulos['honorarios']:            
             
@@ -356,19 +344,22 @@ def teste_unitario(caminho, models, modulos, Verbose=False, MedRobot=False, Mode
         return None
           
 models = {
-    "honorarios" : "gpt-3.5-turbo-16k", 
-    #"honorarios" : "gpt-4o",
+    #"honorarios" : "gpt-3.5-turbo-16k", 
+    "honorarios" : "gpt-4o",
     #"outros" : "gpt-4o", 
     #"outros" : "gpt-3.5-turbo", 
+    "doutros" : "gpt-4o",
+    #"doutros" : "gpt-3.5-turbo-16k", 
     #"doutros" : "gpt-4o",
-    "doutros" : "gpt-3.5-turbo-16k", 
-    #"doutros" : "gpt-4o",
-    #"medicamentos" : "gpt-4o",
-    "medicamentos" : "gpt-3.5-turbo",
-    #"alimentares" : "gpt-4o",
-    "alimentares" : "gpt-3.5-turbo-16k",    
+    "medicamentos" : "gpt-4o",
+    #"medicamentos" : "gpt-3.5-turbo",
+    "alimentares" : "gpt-4o",
+    #"alimentares" : "gpt-3.5-turbo-16k",
+    #"internacao" : "gpt-3.5-turbo-16k",   
+    "internacao" : "gpt-4o",      
     #"resumo" : "gpt-4o",
-    "resumo" : "gpt-4o"
+    "resumo" : "gpt-4o",
+    "geral" : "gpt-4o"
 }
 
 
@@ -384,24 +375,25 @@ models = {
 modulos = {
     "medicamentos" : False,
     "alimentares" : False,
-    "outros" : True, 
+    "outros" : False, 
     "honorarios" : False, 
     "precos" : False,
+    "geral" : True
 }
 
-#caminho_completo = os.path.join(os.getcwd(), "uploads", "sentenca_II_8.pdf")
-#roda_teste(models=models, Seleciona=False, Verbose=False, MedRobot=True)
+caminho_completo = os.path.join(os.getcwd(), "uploads", "peticao_NA_27.pdf")
 
-caminho_completo = os.path.join(os.getcwd(), "uploads", "decisao_I_4.pdf")
+#roda_teste(models=models, Verbose=False, MedRobot=True)
+
+#caminho_completo = os.path.join(os.getcwd(), "uploads", "decisao_I_4.pdf")
 
 #caminho_completo = r'H:\Meu Drive\Trabalhos\2023\projetos\UNIFOR\prosaude\robo_portaria_v6\uploads\sentenca_I_9.pdf'
 
-#AnalisePortaria(caminho_completo,  models, Mode="Decisão", Verbose=True, MedRobot=False)
-AnalisePortaria(caminho_completo, models, TipoDocumento="Decisão", Verbose=True, MedRobot=True, Resumo=True)
+
+AnalisePortaria(caminho_completo, models, TipoDocumento="Indeterminado", Verbose=True, MedRobot=True, Resumo=True)
 
 
-
-#teste_unitario(caminho_completo, modulos=modulos, models=models, Verbose=True, MedRobot=False, Mode="Decisão")
+#teste_unitario(caminho_completo, modulos=modulos, models=models, Verbose=True, MedRobot=False, TipoDocumento="Decisão Interlocutória", Resumo=True)
 
 """
 caminho_completo = os.path.join(os.getcwd(), "uploads", "sentenca_II_1.pdf")
