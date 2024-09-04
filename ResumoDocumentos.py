@@ -17,8 +17,11 @@ def GeraResumo(pages, model, api_key, Verbose=False):
   try:
     
     prompt_template = """
-        Você é um assessor jurídico e precisa resumir o conteúdo de um documento solicitando ou obrigando a fornecer itens e/ou serviços da área médica. 
-    O resumo deve ser escrito em português do Brasil e deve conter as seguintes informações:
+        Você é um assessor jurídico e precisa resumir o conteúdo de um documento solicitando ou obrigando a fornecer itens e/ou serviços da área médica.
+        Considere como medicamentos apenas substâncias ou compostos farmacêuticos usados exclusivamente para tratar, prevenir ou curar doenças. 
+        Outros itens médicos ou de assistência, como fraldas,compostos alimentares, seringas, luvas, oxímetro, leitos hospitalares ou termômetros não são medicamentos.
+        Em hipótese alguma forneça na lista medicamentos que não estavam na decisão. Se não houverem medicamentos, apenas responda que não há medicamentos.
+        O resumo deve ser escrito em português do Brasil e deve conter as seguintes informações:
 
         **Resumo do Documento**
 
@@ -46,36 +49,7 @@ def GeraResumo(pages, model, api_key, Verbose=False):
         "{text}"
         Resumo do texto:"""
     
-    '''
-    prompt_template = """Você é um assessor jurídico e precisa resumir o conteúdo de um documento solicitando ou obrigando a fornecer itens e/ou serviços da área médica. 
-    O resumo deve ser escrito em português do Brasil e deve conter as seguintes informações:
-    - Se é uma Sentença, Decisão interlocutória ou Petição Inicial (documento inicial da ação)
-    - Valor da Causa
-    - Lista completa dos itens a serem fornecidos, com suas especificações tais como nomes completos e quantidades
-    - Se houverem medicamentos, os nomes, dosagem, quantidade e duração do tratamento
-    - Se contém solicitação ou obrigação de internação ou transferência para Unidade de Terapia Intensiva (UTI) ou Unidade de Cuidados Especiais (UCE)
-    - Se há solicitação ou condenação por danos morais
-    - Se há condenação por honorários, dizendo quem foi condenado e em que valor
-    - Se há condenação por multa ou bloqueio de recursos e em que valor
-    "{text}"
-    Resumo do texto:"""
-    '''
-    '''
-    prompt_template = """Você é um assessor jurídico e precisa resumir o conteúdo de um documento solicitando ou obrigando a fornecer itens e/ou serviços da área médica. 
-    O resumo deve ser escrito em português do Brasil e deve conter as seguintes informações:
-    - Valor da Causa
-    - Lista completa dos itens a serem fornecidos, com suas especificações tais como nomes completos e quantidades
-    - Se houverem medicamentos, os nomes, dosagem, quantidade e duração do tratamento
-    - Se contém solicitação ou obrigação de internação ou transferência para Unidade de Terapia Intensiva (UTI) ou Unidade de Cuidados Especiais (UCE)
-    - Se é solicitada indenização por danos morais
-    - Se há condenação por danos morais
-    - Se há condenação por honorários, dizendo quem foi condenado e em que valor
-    - Se há condenação por multa ou bloqueio de recursos e em que valor
-    "{text}"
-    Resumo do texto:"""
-    '''
-    
-    
+       
     prompt = PromptTemplate.from_template(prompt_template)
     
     #llm = ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo-16k")
