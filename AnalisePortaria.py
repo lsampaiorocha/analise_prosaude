@@ -8,15 +8,19 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from dotenv import load_dotenv
 
 #importa as funções de análise dos demais módulos
-from PreProcessamento import *
-from RobosConsultasMedicamentos import *
-from AnaliseMedicamentos import *
-from AnaliseOutros import *
-from AnaliseHonorarios import *
-from AnaliseAlimentares import *
-from AnaliseInternacao import *
-from AnaliseConsultaExameProcedimentoInternacao import *
-from ResumoDocumentos import *
+from ModulosAnalise.PreProcessamento import *
+from ModulosAnalise.RobosConsultasMedicamentos import *
+from ModulosAnalise.AnaliseMedicamentos import *
+from ModulosAnalise.AnaliseOutros import *
+from ModulosAnalise.AnaliseHonorarios import *
+from ModulosAnalise.AnaliseAlimentares import *
+from ModulosAnalise.AnaliseInternacao import *
+from ModulosAnalise.ResumoDocumentos import *
+
+import os
+import tempfile
+from werkzeug.datastructures import FileStorage
+from werkzeug.utils import secure_filename
 
 class TipoDocumentoIndeterminadoException(Exception):
     pass
@@ -89,7 +93,36 @@ def inicializa_dicionario():
 #e retorna um dicionário com todas informações relacionadas à aplicação da portaria 01/2017
 #MedRobot controla se o robô de consultas no google e anvisa será utilizado (há uma maior demora)
 #Os tipos de documento possíveis são: "Petição Inicial", "Decisão Interlocutória" (interlocutória), "Sentença" e "Indeterminado"
-def AnalisePortaria(caminho, models, Verbose=False, MedRobot=True, TipoDocumento="Indeterminado", Resumo=True):
+def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True, TipoDocumento="Indeterminado", Resumo=True):
+    
+    # Verifica se a entrada é um objeto do tipo FileStorage (ou seja, um arquivo) ou um caminho
+    if isinstance(entrada, FileStorage):
+               
+        # Verifica se o arquivo está vazio
+      #  if entrada.content_length == 0:
+      #      raise ValueError("O arquivo enviado está vazio.")
+        
+        # Define uma pasta local específica onde os arquivos serão salvos
+        pasta_destino = os.path.join(os.getcwd(), 'temp')
+        
+        if not os.path.exists(pasta_destino):
+            os.makedirs(pasta_destino)
+        
+        # Cria um nome de arquivo específico, por exemplo, usando o ID do documento ou um timestamp
+        nome_arquivo =  pdf_filename  
+                
+        # Monta o caminho completo para o arquivo na pasta de destino
+        caminho_arquivo = os.path.join(pasta_destino, nome_arquivo)
+        
+        # Salva o arquivo no diretório local específico
+        #entrada.save(caminho_arquivo)
+        
+        caminho = caminho_arquivo
+    else:
+        # A entrada já é um caminho para o arquivo
+        caminho = entrada
+    
+    
     
     if Verbose:
         print("Modo verbose ativado.")    
@@ -145,6 +178,8 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
     
     #armazena na resposta o resumo
     resposta["resumo"] = pages[0].page_content
+    
+    print(f"WTF? {TipoDocumento}")
     
     #armazena na resposta o tipo de documento identificado
     if TipoDocumento == "Decisão":
@@ -270,15 +305,15 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
 
         if Verbose:
             exibe_dados(resposta)
-            print(f"Custo com LLMs para Resumo: {"$ {:.4f}".format(CustoGpt4o(CustoResumo[0],CustoResumo[1]))}")
-            print(f"Custo com LLMs para extração de medicamentos: {"$ {:.4f}".format(CustoGpt4o(cmeds[0],cmeds[1]))}")
-            print(f"Custo com LLMs para detecção de outros itens: {"$ {:.4f}".format(CustoGpt4o(cdoutros[0],cdoutros[1]))}")
-            print(f"Custo com LLMs para detecção de condenação por honorários: {"$ {:.4f}".format(CustoGpt4o(chonor[0],chonor[1]))}")
-            print(f"Custo com LLMs para detecção de internação: {"$ {:.4f}".format(CustoGpt4o(cinterna[0],cinterna[1]))}")
-            print(f"Custo total com LLMs: {"$ {:.4f}".format(resposta['custollm'])}")
+            #print(f"Custo com LLMs para Resumo: {"$ {:.4f}".format(CustoGpt4o(CustoResumo[0],CustoResumo[1]))}")
+            #print(f"Custo com LLMs para extração de medicamentos: {"$ {:.4f}".format(CustoGpt4o(cmeds[0],cmeds[1]))}")
+            #print(f"Custo com LLMs para detecção de outros itens: {"$ {:.4f}".format(CustoGpt4o(cdoutros[0],cdoutros[1]))}")
+            #print(f"Custo com LLMs para detecção de condenação por honorários: {"$ {:.4f}".format(CustoGpt4o(chonor[0],chonor[1]))}")
+            #print(f"Custo com LLMs para detecção de internação: {"$ {:.4f}".format(CustoGpt4o(cinterna[0],cinterna[1]))}")
+            #print(f"Custo total com LLMs: {"$ {:.4f}".format(resposta['custollm'])}")
     
         
-    if TipoDocumento == "Decisão Interlocutória" or TipoDocumento == "Petição Inicial":
+    if TipoDocumento == "Decisão" or TipoDocumento == "Petição Inicial":
         
         #analisa se existe condenação por honorários na sentença
         #(honor, chonor) = AnaliseHonorarios(docsearch, model=models['honorarios'], Verbose=Verbose, Resumo=Resumo)
@@ -396,13 +431,16 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
 
         if Verbose:
             exibe_dados(resposta)
-            print(f"Custo com LLMs para Resumo: {"$ {:.4f}".format(CustoGpt4o(CustoResumo[0],CustoResumo[1]))}")
-            print(f"Custo com LLMs para extração de medicamentos: {"$ {:.4f}".format(CustoGpt4o(cmeds[0],cmeds[1]))}")
-            print(f"Custo com LLMs para detecção de outros itens: {"$ {:.4f}".format(CustoGpt4o(cdoutros[0],cdoutros[1]))}")
-            print(f"Custo com LLMs para detecção de condenação por honorários: {"$ {:.4f}".format(CustoGpt4o(chonor[0],chonor[1]))}")
-            print(f"Custo com LLMs para detecção de internação: {"$ {:.4f}".format(CustoGpt4o(cinterna[0],cinterna[1]))}")
-            print(f"Custo total com LLMs: {"$ {:.4f}".format(resposta['custollm'])}")
-    
+            #print(f"Custo com LLMs para Resumo: {"$ {:.4f}".format(CustoGpt4o(CustoResumo[0],CustoResumo[1]))}")
+            #print(f"Custo com LLMs para extração de medicamentos: {"$ {:.4f}".format(CustoGpt4o(cmeds[0],cmeds[1]))}")
+            #print(f"Custo com LLMs para detecção de outros itens: {"$ {:.4f}".format(CustoGpt4o(cdoutros[0],cdoutros[1]))}")
+            #print(f"Custo com LLMs para detecção de condenação por honorários: {"$ {:.4f}".format(CustoGpt4o(chonor[0],chonor[1]))}")
+            #print(f"Custo com LLMs para detecção de internação: {"$ {:.4f}".format(CustoGpt4o(cinterna[0],cinterna[1]))}")
+            #print(f"Custo total com LLMs: {"$ {:.4f}".format(resposta['custollm'])}")
+    else:
+        if Verbose:
+            print("Nenhum pipeline de análise foi aplicado")
+        
     return resposta
 
 

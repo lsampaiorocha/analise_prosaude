@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Envie o PDF</title>
+</head>
+<body>
+    <h1>Envie o seu PDF para análise</h1>
+    <form action="/analisePortaria" method="POST" enctype="multipart/form-data">
+        <label for="id">ID:</label>
+        <input type="text" name="id" required>
+        <br><br>
+        <label for="pdf">Escolha o PDF:</label>
+        <input type="file" name="pdf" accept="application/pdf" required>
+        <br><br>
+        <button type="submit">Enviar</button>
+    </form>
+</body>
+</html>
