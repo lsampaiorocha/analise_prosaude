@@ -12,4 +12,6 @@ def create_app():
     app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
     app.config['MAX_CONTENT_LENGTH'] = 25* 1024 * 1024 # Tamanho máximo: 25MB
     configure_routes(app)
+ 
+
     return app

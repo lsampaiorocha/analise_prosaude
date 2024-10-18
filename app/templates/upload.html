@@ -1,20 +1,42 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Envie o PDF</title>
+    <title>Análise Portaria Completo</title>
 </head>
 <body>
-    <h1>Envie o seu PDF para análise</h1>
-    <form action="/analisePortaria" method="POST" enctype="multipart/form-data">
-        <label for="id">ID:</label>
-        <input type="text" name="id" required>
-        <br><br>
-        <label for="pdf">Escolha o PDF:</label>
-        <input type="file" name="pdf" accept="application/pdf" required>
-        <br><br>
-        <button type="submit">Enviar</button>
+    <h1>Formulário de Análise Portaria Completo</h1>
+    
+    <!-- Formulário existente para análise individual -->
+    <form action="/AnalisePortariaCompleto" method="POST">
+        <label for="numero_processo">Número do Processo:</label><br>
+        <input type="text" id="numero_processo" name="numero_processo" required><br><br>
+        <input type="submit" value="Enviar">
     </form>
+
+    <!-- Formulário para inserir no banco -->
+    <form action="/InserirBanco" method="POST">
+        <input type="hidden" id="numero_processo" name="numero_processo" value="">
+        <input type="submit" value="Inserir no Banco">
+    </form>
+
+    <!-- Novo formulário para Análise Portaria Massivo Completo -->
+    <form action="/AnalisePortariaMassivoCompleto" method="POST">
+        <input type="hidden" id="numero_processo_massivo" name="numero_processo_massivo" value="">
+        <input type="submit" value="Análise Massivo Completo">
+    </form>
+
+    <script>
+        const processoInput = document.querySelector('#numero_processo');
+        const bancoForm = document.querySelector('form[action="/InserirBanco"]');
+        const massivoForm = document.querySelector('form[action="/AnalisePortariaMassivoCompleto"]');
+        
+        // Preenche os campos ocultos no segundo e no terceiro formulário com os mesmos valores do primeiro
+        processoInput.addEventListener('input', () => {
+            bancoForm.querySelector('input[name="numero_processo"]').value = processoInput.value;
+            massivoForm.querySelector('input[name="numero_processo_massivo"]').value = processoInput.value;
+        });
+    </script>
 </body>
 </html>

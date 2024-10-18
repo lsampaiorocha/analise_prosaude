@@ -242,7 +242,6 @@ def ExtraiTipoDocumento(resumo):
     for t in tipos_possiveis:
         if re.search(t, linha, re.IGNORECASE):
             encontrados.append(t)
-    print("##############",len(encontrados))
     # Se mais de um tipo de documento for encontrado, ou nenhum, retornar "Não determinado"
     if len(encontrados) > 1 or len(encontrados) == 0:
         tipo_identificado = "Indeterminado"

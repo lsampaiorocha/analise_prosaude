@@ -149,14 +149,34 @@ def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True,
 
         #utiliza embeddings da OpenAI para o banco de vetores Chroma
         embeddings = OpenAIEmbeddings()
+        #docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 128})
         docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024}) #essa opção "hnsw:M": 1024 é importante para não ter problemas
             
         #aplica o pipeline de análise apropriado ao tipo de documento
         resposta = AnalisePipeline(filtered_pages, docsearch, models, Verbose, MedRobot, TipoDocumento=tipo_documento, Resumo=Resumo, CustoResumo=custoresumo)
 
         #apaga as entradas criadas no Chroma
+
         docsearch._collection.delete(ids=ids)
-        
+        #docsearch.persist()  # salva quaisquer mudanças
+        #docsearch._collection.close()  # encerra a conexão
+        #docsearch.delete_collection() 
+        docsearch = None 
+        ids = [] 
+
+        with open(__file__, 'r+') as f:
+            # Lê o conteúdo do arquivo
+            content = f.read()
+            
+            # Faça qualquer modificação no conteúdo (opcional)
+            # content = content.replace('antigo_texto', 'novo_texto')
+
+            # Volta para o início do arquivo e sobrescreve
+            f.seek(0)
+            f.write(content)
+            f.truncate()
+
+
         return resposta
     
     except IndexError:
@@ -178,8 +198,6 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
     
     #armazena na resposta o resumo
     resposta["resumo"] = pages[0].page_content
-    
-    print(f"WTF? {TipoDocumento}")
     
     #armazena na resposta o tipo de documento identificado
     if TipoDocumento == "Decisão":
@@ -313,7 +331,7 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
             #print(f"Custo total com LLMs: {"$ {:.4f}".format(resposta['custollm'])}")
     
         
-    if TipoDocumento == "Decisão" or TipoDocumento == "Petição Inicial":
+    if TipoDocumento == "Decisão Interlocutória" or TipoDocumento == "Petição Inicial":
         
         #analisa se existe condenação por honorários na sentença
         #(honor, chonor) = AnaliseHonorarios(docsearch, model=models['honorarios'], Verbose=Verbose, Resumo=Resumo)
@@ -437,10 +455,7 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
             #print(f"Custo com LLMs para detecção de condenação por honorários: {"$ {:.4f}".format(CustoGpt4o(chonor[0],chonor[1]))}")
             #print(f"Custo com LLMs para detecção de internação: {"$ {:.4f}".format(CustoGpt4o(cinterna[0],cinterna[1]))}")
             #print(f"Custo total com LLMs: {"$ {:.4f}".format(resposta['custollm'])}")
-    else:
-        if Verbose:
-            print("Nenhum pipeline de análise foi aplicado")
-        
+    
     return resposta
 
 

@@ -1,68 +1,65 @@
 # app/routes.py
 from flask import request, jsonify, Flask, render_template
-
 from AnalisePortaria import *
+
+#Lógica de execução das rotas
+from logica import *
+
 
 def configure_routes(app):
   
   @app.route('/')
   def home():
-      #return jsonify({"message": "Bem-vindo ao servidor!"})
-      return render_template('upload.html')  
+    return render_template('upload.html')
 
-  @app.route('/analisePortaria', methods=['POST'])
-  def analise():
-        # Verifica se o arquivo foi enviado
-        if 'pdf' not in request.files:
-            return jsonify({"error": "Nenhum arquivo PDF enviado!"}), 400
+    
+  @app.route('/ImportarProcessos', methods=['POST'])
+  def importacao_processos():
+    
+    """
+    Rota para importar os processos de intimações cujos autos já tenham sido baixados pelos
+    robô de distribuição de processos (tabela tb_autosprocessos) para a tabela tb_analiseportaria
+    """ 
+    importar_processos()
+  
+
+  @app.route('/AnalisarProcessosMarcados', methods=['POST'])
+  def analise_marcados():
+    
+    """
+    Rota para analisar todos os processos da tabela tb_analiseportaria tais que:
+        - não tenham sido ainda analisados
+        - estejam marcados para análise 
+        - possuam o campo id_documento definido
+    """ 
+    
+    analisar_marcados()
+
+    
+    
+    
+  @app.route('/AnalisePortariaProcesso', methods=['POST'])
+  def analise_processo():
+        """
+        Rota de análise de aplicação de portaria para um processo.
+        A rota recebe um número de processo como parâmetro e executa diversas etapas necessárias para
+        análise, desde a recuperação dos autos no Alfresco, até a extração do documento a ser analisado
+        e aplicação do pipeline de análise de aplicação de portaria
         
-        pdf_file = request.files['pdf']  # Obtém o arquivo PDF
-        id_string = request.form.get('id')  # Obtém o ID
-
-        # Adiciona depuração para ver o que o Flask está recebendo
-        print(f"Arquivo recebido: {pdf_file.filename}, tamanho: {pdf_file.content_length} bytes")
-
-
-        # Verifica se o arquivo tem nome e conteúdo
-        if pdf_file.filename == '':
-          return jsonify({"error": "Nenhum arquivo PDF selecionado!"}), 400
-
-        # Verifica se o arquivo está vazio -- Causava Erro
-        #if pdf_file.content_length == 0:
-        #    #raise ValueError("O arquivo enviado está vazio!!")
-        #  return jsonify({"error": "O arquivo enviado está vazio!"}), 400
-        pdf_content = pdf_file.read()
-        if len(pdf_content) == 0:
-            return jsonify({"error": "O arquivo enviado está vazio!"}), 400
-        pdf_file.seek(0)  # Reseta o ponteiro do arquivo
-
-
-
-        if not id_string:
-            return jsonify({"error": "ID não fornecido!"}), 400
+        Parâmetros:
+        - numero_processo (form): Número do processo a ser analisado.
         
-        pdf_filename = f"{id_string}_{pdf_file.filename}"
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
-        pdf_file.save(file_path)
-
+        Fluxo:
+        1. Validação do número de processo e mesmo foi marcado para análise.
+        2. Download dos autos completos do processo (Alfresco).
+        3. Processamento dos autos para extrair o documento a ser analisado
+        4. Execução do pipeline de Análise.
+        5. Escrita dos resultados da análise no BD.
+        """    
+        
+        numero_processo = request.form.get('numero_processo')
+        #TODO: Verificar casos em que o número não tenha sido passado no formato padrão
+        
+        analisar_processo(numero_processo)
         
         
-        models = {
-          "honorarios" : "gpt-4o",
-          "doutros" : "gpt-4o",
-          "medicamentos" : "gpt-4o",
-          "alimentares" : "gpt-4o",
-          "internacao" : "gpt-4o",      
-          "resumo" : "gpt-4o",
-          "geral" : "gpt-4o"
-        }
-        
-        
-        # Aqui você pode processar o arquivo e o ID como quiser
-        resultado = AnalisePortaria(pdf_file, models, pdf_filename, Verbose=True) 
-        
-        # Retorna a resposta com o resultado do processamento
-        return jsonify(resultado), 200
-
-
-
