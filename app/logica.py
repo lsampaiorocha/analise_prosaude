@@ -207,7 +207,10 @@ def analisar_marcados():
           text1 = page.get_text()
           if f"Num. {id_andamento} - Pág." in text1:
               pages_to_extract.append(page_num)
-
+              
+      if len(pages_to_extract) == 0:
+          return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
+ 
       new_pdf = fitz.open()
 
       text_length = 0 
@@ -218,6 +221,8 @@ def analisar_marcados():
           text2 = page.get_text()
           full_text += text2
           text_length += len(text2)
+          
+      
 
       output_path = "temp"  
       filename = "portaria_temp.pdf"           
@@ -233,12 +238,12 @@ def analisar_marcados():
       with open(file_path, 'rb') as file:
           pdf_content = file.read()
 
-      if len(pdf_content) == 0:
-          return jsonify({"error": "O arquivo enviado está vazio!"}), 400
+      
       
       #pdf_filename = f"{id_andamento}_{filename}"
       pdf_filename = filename
-      file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
+      #file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
+      file_path = os.path.join('temp', pdf_filename)
       #pdf_file.save(file_path)
 
       
@@ -526,7 +531,8 @@ def analisar_processo(numero_processo):
   
   #pdf_filename = f"{id_andamento}_{filename}"
   pdf_filename = filename
-  file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
+  #file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
+  file_path = os.path.join('temp', pdf_filename)
   #pdf_file.save(file_path)
 
   
