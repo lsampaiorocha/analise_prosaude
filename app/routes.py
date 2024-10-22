@@ -3,7 +3,7 @@ from flask import request, jsonify, Flask, render_template
 from AnalisePortaria import *
 
 #Lógica de execução das rotas
-from .logica import *
+from logica import *
 
 
 def configure_routes(app):
@@ -20,7 +20,7 @@ def configure_routes(app):
     Rota para importar os processos de intimações cujos autos já tenham sido baixados pelos
     robô de distribuição de processos (tabela tb_autosprocessos) para a tabela tb_analiseportaria
     """ 
-    return importar_processos()
+    importar_processos()
   
 
   @app.route('/AnalisarProcessosMarcados', methods=['POST'])
@@ -33,7 +33,7 @@ def configure_routes(app):
         - possuam o campo id_documento definido
     """ 
     
-    return analisar_marcados()
+    analisar_marcados()
 
     
     
@@ -60,6 +60,16 @@ def configure_routes(app):
         numero_processo = request.form.get('numero_processo')
         #TODO: Verificar casos em que o número não tenha sido passado no formato padrão
         
-        return analisar_processo(numero_processo)
-        
-        
+        analisar_processo(numero_processo)
+
+    
+  @app.route('/CapturaIdsProcessos', methods=['POST'])
+  def Captura_ids():
+    '''
+    Função que baixa os autos a partir de um número de processo e preenche a tabela tb_documentosautos.
+    '''
+    numero_processo = request.form.get('numero_processo')
+    retorno = captura_ids_processo(numero_processo)    
+    if retorno is True:
+      return jsonify({"message": "Processo atualizado com sucesso."}), 200
+      
