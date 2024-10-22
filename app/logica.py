@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, DECIMAL, ForeignKey, text, schema
+from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, DECIMAL, ForeignKey,text, schema
 from sqlalchemy.orm import sessionmaker 
 from AnalisePortaria import *
 
@@ -14,7 +14,118 @@ import os
 
 from datetime import datetime
 
+#Função para baixar o pdf no alfresco a partir do numero do processo
+def importar_autos_alfresco(n_processo,DATABASE_URL):  
+      engine_alfresco = create_engine(DATABASE_URL)
+      Session_alfresco = sessionmaker(bind=engine_alfresco)  
+      metadata_alfresco = MetaData()
+      
+      session_alfresco = Session_alfresco()
+      query = text('SELECT numerounico, idalfresco FROM scm_robo_intimacao.tb_autosprocessos WHERE numerounico = :numero_processo')
+      resultado_alfresco = session_alfresco.execute(query, {"numero_processo": n_processo}).fetchone()
 
+      id_alfresco =  resultado_alfresco[1]
+      
+      session_alfresco.commit()
+
+      
+
+      alfresco_url = "http://ccged.pge.ce.gov.br:8080"
+      username = "ccportalprocurador"
+      password = "aeH}ie0nar"
+      parent_node_id = "bf4f65fc-ee14-46d7-afe1-7a680f01515d"
+
+
+      download_url = f"{alfresco_url}/alfresco/api/-default-/public/alfresco/versions/1/nodes/{id_alfresco}/content"
+      try:
+          response = requests.get(download_url, auth=HTTPBasicAuth(username, password))
+          if response.status_code == 200:
+              content_type = response.headers.get('Content-Type')
+              file_extension = content_type.split(';')[0]
+              if file_extension == 'application/vnd.oasis.opendocument.text':
+                  file_extension = 'odt'
+              elif file_extension == 'application/pdf':
+                  file_extension = 'pdf'
+              elif file_extension == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                  file_extension = 'docx'
+              else:
+                  return False
+              path = f"arquivos/{id_alfresco}.{file_extension}"
+              with open(path, 'wb') as file:  # Assumindo que o arquivo é um PDF
+                  file.write(response.content)
+          
+      except Exception as e:
+          print("Erro no donwload do arquivo: ", e)
+          return False
+      return path       
+
+#Função que irá separar o documento a ser analisado pela portaria do restante dos autos 
+def separar_pelo_id(path,id_andamento): 
+    pdf_document = fitz.open(path)
+    pages_to_extract = []
+    for page_num in range(len(pdf_document)):
+        page = pdf_document.load_page(page_num)
+        text1 = page.get_text()
+        if f"Num. {id_andamento} - Pág." in text1:
+            pages_to_extract.append(page_num)
+
+    new_pdf = fitz.open()
+
+    text_length = 0 
+    full_text = ""
+    for page_num in pages_to_extract:
+        new_pdf.insert_pdf(pdf_document, from_page=page_num, to_page=page_num)
+        page = pdf_document.load_page(page_num)
+        text2 = page.get_text()
+        full_text += text2
+        text_length += len(text2)
+
+    output_path = "temp"  
+    filename = "portaria_temp.pdf"           
+    file_path = f"{output_path}/{filename}"
+
+    # Salva o novo PDF
+    new_pdf.save(file_path)
+    new_pdf.close()
+    pdf_document.close()
+    return file_path,filename
+
+def primeira_pagina(n_processo,id_andamento):
+    DB_PARAMS = {
+        'host': '192.168.2.64',
+        'database': 'db_pge',
+        'user': 'scm_robo',
+        'password': 'x6ZP&Fc45k(<',
+        'port': '5432'
+        }
+
+    DATABASE_URL = f"postgresql://{DB_PARAMS['user']}:{DB_PARAMS['password']}@{DB_PARAMS['host']}:{DB_PARAMS['port']}/{DB_PARAMS['database']}"
+    path = importar_autos_alfresco(n_processo, DATABASE_URL)
+    file_path,filename = separar_pelo_id(path,id_andamento)
+
+    pdf_document = fitz.open(file_path)
+    #pages_to_extract = []
+    page_num = 0
+    page = pdf_document.load_page(page_num)
+    new_pdf = fitz.open()
+    text_length = 0 
+    full_text = ""
+    new_pdf.insert_pdf(pdf_document, from_page=page_num, to_page=page_num)
+    output_path = "temp"  
+    filename = "primeira_pagina_temp.pdf"           
+    file_path = f"{output_path}/{filename}"
+
+    # Salva o novo PDF
+    new_pdf.save(file_path)
+    new_pdf.close()
+    pdf_document.close()
+    return file_path,filename
+
+    # Salva o novo PDF
+    new_pdf.save(file_path)
+    new_pdf.close()
+    pdf_document.close()
+    return file_path,filename
 
 def importar_processos():
   
@@ -100,9 +211,7 @@ def importar_processos():
   session.commit()
 
   return jsonify(resultado1), 200
-  
-  
-  
+   
 def analisar_marcados():
 
   """
@@ -144,109 +253,29 @@ def analisar_marcados():
   resultados = session.execute(query).fetchall()
   
   for resultado in resultados:
-
-      # Função para capturar o id do alfresco através do número do processo        
-      engine2 = create_engine(DATABASE_URL)
-      Session2 = sessionmaker(bind=engine2)  
-      metadata2 = MetaData()
-      tb_autosprosaude = Table(
-              'tb_autosprosaude', metadata2,
-              Column('id', Integer, primary_key=True),
-              schema='scm_robo_intimacao'
-          )
-              
       n_processo = resultado[0]     
       id_andamento = resultado[2]   
-
-      session2 = Session()
-      query = text('SELECT numerounico, idalfresco FROM scm_robo_intimacao.tb_autosprocessos WHERE numerounico = :numero_processo')
-      resultado4 = session2.execute(query, {"numero_processo": n_processo}).fetchone()
-
-
-
-      id_alfresco =  resultado4[1]
       
-      session2.commit()
-
-      #Função para baixar o pdf a partir do id do alfresco
-
-      alfresco_url = "http://ccged.pge.ce.gov.br:8080"
-      username = "ccportalprocurador"
-      password = "aeH}ie0nar"
-      parent_node_id = "bf4f65fc-ee14-46d7-afe1-7a680f01515d"
-
-
-      download_url = f"{alfresco_url}/alfresco/api/-default-/public/alfresco/versions/1/nodes/{id_alfresco}/content"
-      try:
-          response = requests.get(download_url, auth=HTTPBasicAuth(username, password))
-          if response.status_code == 200:
-              content_type = response.headers.get('Content-Type')
-              file_extension = content_type.split(';')[0]
-              if file_extension == 'application/vnd.oasis.opendocument.text':
-                  file_extension = 'odt'
-              elif file_extension == 'application/pdf':
-                  file_extension = 'pdf'
-              elif file_extension == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-                  file_extension = 'docx'
-              else:
-                  print("Retorna True")
-                  return True
-              path = f"arquivos/{id_alfresco}.{file_extension}"
-              with open(path, 'wb') as file:  # Assumindo que o arquivo é um PDF
-                  file.write(response.content)
-          
-      except Exception as e:
-          print("Erro no donwload do arquivo: ", e)
-          return False
+      #Função para baixar o pdf no alfresco a partir do numero do processo
+      path = importar_autos_alfresco(n_processo,DATABASE_URL)
+     
+      if path is False:
+        return jsonify({"error":"Processo não encontrado no Alfresco!"}), 400  
+      
       
       # Função para separar a peça dado o id do documento
-      pdf_document = fitz.open(path)
-      pages_to_extract = []
-      for page_num in range(len(pdf_document)):
-          page = pdf_document.load_page(page_num)
-          text1 = page.get_text()
-          if f"Num. {id_andamento} - Pág." in text1:
-              pages_to_extract.append(page_num)
-              
-      if len(pages_to_extract) == 0:
-          return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
- 
-      new_pdf = fitz.open()
-
-      text_length = 0 
-      full_text = ""
-      for page_num in pages_to_extract:
-          new_pdf.insert_pdf(pdf_document, from_page=page_num, to_page=page_num)
-          page = pdf_document.load_page(page_num)
-          text2 = page.get_text()
-          full_text += text2
-          text_length += len(text2)
-          
+      file_path,filename = separar_pelo_id(path,id_andamento)
       
-
-      output_path = "temp"  
-      filename = "portaria_temp.pdf"           
-      file_path = f"{output_path}/{filename}"
-
-      # Salva o novo PDF
-      new_pdf.save(file_path)
-      new_pdf.close()
-      pdf_document.close()
-
       pdf_file = fitz.open(file_path)
 
       with open(file_path, 'rb') as file:
-          pdf_content = file.read()
+        pdf_content = file.read()
 
-      
-      
-      #pdf_filename = f"{id_andamento}_{filename}"
+      if len(pdf_content) == 0:
+        return jsonify({"error": "O arquivo enviado está vazio!"}), 400
+
       pdf_filename = filename
-      #file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
-      file_path = os.path.join('temp', pdf_filename)
-      #pdf_file.save(file_path)
-
-      
+      file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)      
       
       models = {
       "honorarios" : "gpt-4o",
@@ -257,8 +286,7 @@ def analisar_marcados():
       "resumo" : "gpt-4o",
       "geral" : "gpt-4o"
       }
-      
-      
+
       # Aqui você pode processar o arquivo e o ID como quiser
       resultado2 = AnalisePortaria(file_path, models, pdf_filename, Verbose=False) 
       
@@ -430,96 +458,29 @@ def analisar_processo(numero_processo):
 
   session = Session()
   # Pesquisa o processo em tb_analiseportaria
-  query = text('SELECT numerounico,marcado_analisar,id_documento_analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso')
+  query = text('SELECT numerounico,marcado_analisar,id_documento_analisado,analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso')
+  ta.analisado is not true
   resultado = session.execute(query, {"numeroprocesso":numero_processo}).fetchone()
-  print(resultado)
   n_processo =  resultado[0]
   marcado_analisar = resultado[1]
   id_andamento = resultado[2]
+  processo_analisado = resultado[3]
   if not n_processo:
       return jsonify({"error":"Processo não encontrado na Tabela!"}), 400
   if marcado_analisar is not True:
       return jsonify({"error":"Processo não foi marcado para analisar!"}), 400
   if not id_andamento:
       return jsonify({"error":"Não foi passado o id do Andamento!"}), 400
+  if processo_analisado is True:
+      return jsonify({"error":"Processo já analisado"}), 400
 
   # Função para capturar o id do alfresco através do número do processo        
-  engine = create_engine(DATABASE_URL)
-  Session = sessionmaker(bind=engine)  
-  metadata = MetaData()
-  tb_autosprosaude = Table(
-          'tb_autosprosaude', metadata,
-          Column('id', Integer, primary_key=True),
-          schema='scm_robo_intimacao'
-      )
-          
-
-  session = Session()
-  query = text('SELECT numerounico, idalfresco FROM scm_robo_intimacao.tb_autosprocessos WHERE numerounico = :numero_processo')
-  resultado = session.execute(query, {"numero_processo": n_processo}).fetchone()
-
-  id_alfresco =  resultado[1]
-  session.commit()
-
-  #Função para baixar o pdf a partir do id do alfresco
-
-  alfresco_url = "http://ccged.pge.ce.gov.br:8080"
-  username = "ccportalprocurador"
-  password = "aeH}ie0nar"
-  parent_node_id = "bf4f65fc-ee14-46d7-afe1-7a680f01515d"
-
-
-  download_url = f"{alfresco_url}/alfresco/api/-default-/public/alfresco/versions/1/nodes/{id_alfresco}/content"
-  try:
-      response = requests.get(download_url, auth=HTTPBasicAuth(username, password))
-      if response.status_code == 200:
-          content_type = response.headers.get('Content-Type')
-          file_extension = content_type.split(';')[0]
-          if file_extension == 'application/vnd.oasis.opendocument.text':
-              file_extension = 'odt'
-          elif file_extension == 'application/pdf':
-              file_extension = 'pdf'
-          elif file_extension == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-              file_extension = 'docx'
-          else:
-              print("Retorna True")
-              return True
-          path = f"arquivos/{id_alfresco}.{file_extension}"
-          with open(path, 'wb') as file:  # Assumindo que o arquivo é um PDF
-              file.write(response.content)
-      
-  except Exception as e:
-      print("Erro no donwload do arquivo: ", e)
-      return False
+  path = importar_autos_alfresco(n_processo,DATABASE_URL)
+  if path is False:
+    return jsonify({"error":"Processo não encontrado no Alfresco!"}), 400  
   
   # Função para separar a peça dado o id do documento
-  pdf_document = fitz.open(path)
-  pages_to_extract = []
-  for page_num in range(len(pdf_document)):
-      page = pdf_document.load_page(page_num)
-      text1 = page.get_text()
-      if f"Num. {id_andamento} - Pág." in text1:
-          pages_to_extract.append(page_num)
-
-  new_pdf = fitz.open()
-
-  text_length = 0 
-  full_text = ""
-  for page_num in pages_to_extract:
-      new_pdf.insert_pdf(pdf_document, from_page=page_num, to_page=page_num)
-      page = pdf_document.load_page(page_num)
-      text2 = page.get_text()
-      full_text += text2
-      text_length += len(text2)
-
-  output_path = "temp"  
-  filename = "portaria_temp.pdf"           
-  file_path = f"{output_path}/{filename}"
-
-  # Salva o novo PDF
-  new_pdf.save(file_path)
-  new_pdf.close()
-  pdf_document.close()
+  file_path,filename = separar_pelo_id(path,id_andamento)
 
   pdf_file = fitz.open(file_path)
 
@@ -529,11 +490,8 @@ def analisar_processo(numero_processo):
   if len(pdf_content) == 0:
       return jsonify({"error": "O arquivo enviado está vazio!"}), 400
   
-  #pdf_filename = f"{id_andamento}_{filename}"
   pdf_filename = filename
-  #file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
-  file_path = os.path.join('temp', pdf_filename)
-  #pdf_file.save(file_path)
+  file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
 
   
   
@@ -675,3 +633,65 @@ def analisar_processo(numero_processo):
   
   # Retorna a resposta com o resultado do processamento
   return jsonify({"message": "Processo atualizado com sucesso."}), 200
+
+def captura_ids_processo(n_processo):
+
+    DB_PARAMS = {
+        'host': '192.168.2.64',
+        'database': 'db_pge',
+        'user': 'scm_robo',
+        'password': 'x6ZP&Fc45k(<',
+        'port': '5432'
+        }
+
+    DATABASE_URL = f"postgresql://{DB_PARAMS['user']}:{DB_PARAMS['password']}@{DB_PARAMS['host']}:{DB_PARAMS['port']}/{DB_PARAMS['database']}"
+    path = importar_autos_alfresco(n_processo, DATABASE_URL)
+    #Função para capturar o id_analise portaria dado o número do processo
+    engine = create_engine(DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+
+    metadata = MetaData()
+    session = Session()
+    # Pesquisa o id da análise no banco pelo número do processo
+    query = text('SELECT numerounico, id FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso')
+    resultado = session.execute(query, {"numeroprocesso":n_processo}).fetchone()
+    id_analiseportaria =  resultado[1]
+
+    # Captura os ids dos andamentos dentro de um processo
+    pdf_document = fitz.open(path)
+
+    for page_num in range(len(pdf_document)):
+        page = pdf_document.load_page(page_num)
+        texto = page.get_text("text")
+        
+        # Verifica se a página tem o padrão "Num. \d{8} - Pág. \d+"
+        if not re.search(r"Num\. \d{8} - Pág\. \d+", texto):
+            # Unir linhas quebradas
+            texto = re.sub(r"\n", " ", texto)
+
+            # Regex para encontrar linhas que correspondem à estrutura da tabela de índices
+            matches = re.findall(
+                r"(\d+)\s+(\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2})\s+(.+?)\s+(.+?)(?=(?:\d+\s+\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2})|$)",
+                texto
+            )
+            for match in matches:
+                id_doc = match[0]
+                data_assinatura = match[1]
+                documento = match[2]
+                tipo = match[3]
+                res =  session.execute(text('SELECT Max(id) as valor_max FROM db_pge.scm_robo_intimacao.tb_documentosautos')).fetchone()
+                max_id = res[0] + 1
+                query_check = text('SELECT numerounico,id_documento FROM db_pge.scm_robo_intimacao.tb_documentosautos WHERE numerounico = :numeroprocesso AND id_documento = :iddocumento')
+                check = session.execute(query_check, {"numeroprocesso":n_processo,"iddocumento": id_doc}).fetchone()
+                if check is None:
+                    insercao = session.execute(text('INSERT into db_pge.scm_robo_intimacao.tb_documentosautos (id, numerounico, id_documento, dt_assinatura, nome,  tipo, id_analiseportaria)values(:id, :numerounico, :id_documento,:dt_assinatura, :nome, :tipo, :id_analiseportaria)'),{'id':max_id,'numerounico':n_processo,'id_documento':id_doc,'dt_assinatura':data_assinatura,'nome':f'{documento}','tipo':tipo,'id_analiseportaria':id_analiseportaria})
+                else: 
+                    continue
+    session.commit()            
+    pdf_document.close()
+    if os.path.isfile(path):
+        os.remove(path) 
+    return True
+
+if __name__ == '__main__':
+ _,_ = primeira_pagina('3000431-69.2024.8.06.0043','87423365')
