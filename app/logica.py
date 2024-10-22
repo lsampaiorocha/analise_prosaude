@@ -79,6 +79,9 @@ def separar_pelo_id(path,id_andamento):
         text2 = page.get_text()
         full_text += text2
         text_length += len(text2)
+        
+    if not pages_to_extract:
+        return None, None
 
     output_path = "temp"  
     filename = "portaria_temp.pdf"           
@@ -102,6 +105,9 @@ def primeira_pagina(n_processo,id_andamento):
     DATABASE_URL = f"postgresql://{DB_PARAMS['user']}:{DB_PARAMS['password']}@{DB_PARAMS['host']}:{DB_PARAMS['port']}/{DB_PARAMS['database']}"
     path = importar_autos_alfresco(n_processo, DATABASE_URL)
     file_path,filename = separar_pelo_id(path,id_andamento)
+    
+    if file_path is None:
+        return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
 
     pdf_document = fitz.open(file_path)
     #pages_to_extract = []
@@ -266,6 +272,9 @@ def analisar_marcados():
       # Função para separar a peça dado o id do documento
       file_path,filename = separar_pelo_id(path,id_andamento)
       
+      if file_path is None:
+        return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
+      
       pdf_file = fitz.open(file_path)
 
       with open(file_path, 'rb') as file:
@@ -275,7 +284,7 @@ def analisar_marcados():
         return jsonify({"error": "O arquivo enviado está vazio!"}), 400
 
       pdf_filename = filename
-      file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)      
+      file_path = os.path.join('temp', pdf_filename)      
       
       models = {
       "honorarios" : "gpt-4o",
@@ -481,6 +490,9 @@ def analisar_processo(numero_processo):
   
   # Função para separar a peça dado o id do documento
   file_path,filename = separar_pelo_id(path,id_andamento)
+  
+  if file_path is None:
+        return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
 
   pdf_file = fitz.open(file_path)
 
@@ -491,7 +503,7 @@ def analisar_processo(numero_processo):
       return jsonify({"error": "O arquivo enviado está vazio!"}), 400
   
   pdf_filename = filename
-  file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
+  file_path = os.path.join('temp', pdf_filename)
 
   
   

@@ -3,7 +3,7 @@ from flask import request, jsonify, Flask, render_template
 from AnalisePortaria import *
 
 #Lógica de execução das rotas
-from logica import *
+from .logica import *
 
 
 def configure_routes(app):
