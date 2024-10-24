@@ -14,7 +14,7 @@ def AnaliseInternacao(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=Tr
     #cost = 0
 
     if not Resumo:
-        llm = ChatOpenAI(model_name="gpt-4", temperature=0)
+        llm = ChatOpenAI(model_name=model, temperature=0)
         #prompt do robô - context vai ser preenchido pela retrieval dos documentos
         system_prompt = (
             "Você é um assessor jurídico analisando documentos jurídicos que podem conter petições, decisões ou sentenças de fornecimento de itens de saúde, tais como medicamentos."
@@ -24,10 +24,11 @@ def AnaliseInternacao(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=Tr
             "Contexto: {context}"
         )
     else:
-        llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+        llm = ChatOpenAI(model_name=model, temperature=0)
         system_prompt = (
         "Você é um assessor jurídico analisando o resumo de um documento que contém uma petição ou decisão judicial."
-        "Utilize o resumo para responder às perguntas. "
+        "Utilize as informações do resumo para responder às perguntas. "
+        "Considere como internação ou transferência para leito hospitalar como qualquer tipo de internação ou tranferência para unidades especializadas de saúde. Isto deve incluir UTIs (Unidades de Terapia Intensiva), UCEs (Unidades de Cuidados Especiais) e unidades de internação psiquiátrica ou para tratamento de drogas, dentre outras."        
         "Seja conciso nas respostas, entregando apenas as informações solicitadas"
         "Resumo: {context}"
         )
@@ -48,7 +49,6 @@ def AnaliseInternacao(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=Tr
 
 
     if not Resumo:
-        #Aqui o objetivo dos prompts é listar os itens que são medicamentos
         q1 = """
             Você é um assessor jurídico analisando um documento que contém uma petições ou decisão judicial.
         
@@ -61,12 +61,10 @@ def AnaliseInternacao(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=Tr
     else:
         q1 = """
         Você é um assessor jurídico analisando o resumo de um documento que contém uma petição ou decisão judicial.
-            
-        Sua tarefa consiste em detectar se o documento solicita ou obriga a internação ou transferência para leito hospitalar, Unidade de Terapia Intensiva (UTI) ou Unidade de Cuidados Especiais (UCE).
         
-        Em hipótese alguma forneça informações que não estavam no resumo do documento. 
+        Considere como internação ou transferência para leito hospitalar como qualquer tipo de internação ou tranferência para unidades especializadas de saúde. Isto deve incluir UTIs (Unidades de Terapia Intensiva), UCEs (Unidades de Cuidados Especiais) e unidades de internação psiquiátrica ou para tratamento de drogas, dentre outras.
             
-        Responda apenas 'Sim' ou 'Não', especificando se houve uma solicitação ou obrigação de internação ou transferência conforme foi especificado.
+        Sua tarefa consiste em verificar no resumo se **Há Internação ou Transferência para leito hospitalar** e responder apenas 'Sim' ou 'Não', de acordo com o que foi dito no resumo.
         """
     
     with get_openai_callback() as c1:

@@ -15,6 +15,7 @@ from ModulosAnalise.AnaliseOutros import *
 from ModulosAnalise.AnaliseHonorarios import *
 from ModulosAnalise.AnaliseAlimentares import *
 from ModulosAnalise.AnaliseInternacao import *
+from ModulosAnalise.AnaliseConsultasProcedimentos import *
 from ModulosAnalise.ResumoDocumentos import *
 
 import os
@@ -45,6 +46,8 @@ def inicializa_dicionario():
   dados = {
     #Resumo do documento
     "resumo": "",
+    #Resumo da análise (para debug)
+    "resumo_analise": "",
     #Tipo de documento
     "tipo_documento": "",
     #Se houve ou não pedido de indenização por danos morais e materiais
@@ -53,8 +56,12 @@ def inicializa_dicionario():
     "condenacao_honorarios": None,
     #Se houve pedido de internação em leito hospitalar, UTI ou UCE
     "internacao": None,
+    #Se houve pedido de consulta exame ou procedimento
+    "possui_consulta": None,
     #Se há outros itens além de medicamentos
     "possui_outros": None,
+    #Se há custeio de conta de energia elétrica
+    "possui_custeio": None,
     #Se há outros itens proibidos
     "possui_outros_proibidos": None,
     #Se os laudos dos autos são públicos ou privados
@@ -181,11 +188,11 @@ def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True,
     
     except IndexError:
         print(f"Erro: Você tentou acessar um índice inválido ao analisar o arquivo {caminho.split()[-1]}.")
-        return None
+        return {"error": "Você tentou acessar um índice inválido ao analisar o arquivo"}
         
     except Exception as e:
         print(f"Erro ao processar o arquivo {caminho.split()[-1]}: {e}")
-        return None
+        return {"error": f"Erro ao processar o arquivo {caminho.split()[-1]}: {e}"}
 
 
 
@@ -199,11 +206,13 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
     #armazena na resposta o resumo
     resposta["resumo"] = pages[0].page_content
     
+    
     #armazena na resposta o tipo de documento identificado
     if TipoDocumento == "Decisão":
         resposta["tipo_documento"] = "Decisão Interlocutória"
     else:
         resposta["tipo_documento"] = TipoDocumento
+
 
     if TipoDocumento == "Sentença":
         
@@ -214,6 +223,11 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
         #analisa se existe pedido de internação em UTI
         (interna, cinterna) = AnaliseInternacao(docsearch, model=models['internacao'], Verbose=Verbose, Resumo=Resumo)
         
+        print(f"Houve internação: {interna}")
+        
+        #analisa se existe realizacao de consultas exames ou procedimentos
+        (consultas, cconsultas) = AnaliseConsultasProcedimentos(docsearch, model=models['internacao'], Verbose=Verbose, Resumo=Resumo)
+        
 
         # Detecta (usando REGEX) se existe outros itens alem de medicamentos na sentença
         # é feita uma diferenciação entre itens proibidos e itens permitidos para aplicação da portaria
@@ -241,7 +255,7 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
         
         #lista contendo os nomes de medicamentos obtidos da sentença
         (lm, cmeds) = AnaliseMedicamentos(docsearch, model=models['medicamentos'], Verbose=Verbose, Resumo=Resumo)
-
+            
         lm_busca = []
         lm_final = []
 
@@ -276,6 +290,7 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
         #preenche se houve condenação por honorários e se há outros itens além de medicamentos
         resposta['condenacao_honorarios'] = honor 
         resposta['internacao'] = interna
+        resposta['possui_consulta'] = consultas
         resposta['possui_outros'] = outros
         resposta['possui_outros_proibidos'] = outrosregex_proibidos
         
@@ -315,11 +330,12 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
 
 
         #custo total com LLMs
-        soma_prompt = sum([cdoutros[0], cmeds[0], chonor[0], CustoResumo[0], cinterna[0]])
-        soma_completion = sum([cdoutros[1], cmeds[1], chonor[1], CustoResumo[1], cinterna[1]])
+        soma_prompt = sum([cdoutros[0], cmeds[0], chonor[0], CustoResumo[0], cinterna[0], cconsultas[0]])
+        soma_completion = sum([cdoutros[1], cmeds[1], chonor[1], CustoResumo[1], cinterna[1], cconsultas[1]])
         resposta['custollm'] = CustoGpt4o(soma_prompt, soma_completion)
         resposta['tokensllm'] = (soma_prompt, soma_completion)
         
+        resposta['resumo_analise'] = str(resposta) 
 
         if Verbose:
             exibe_dados(resposta)
@@ -330,8 +346,8 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
             #print(f"Custo com LLMs para detecção de internação: {"$ {:.4f}".format(CustoGpt4o(cinterna[0],cinterna[1]))}")
             #print(f"Custo total com LLMs: {"$ {:.4f}".format(resposta['custollm'])}")
     
-        
-    if TipoDocumento == "Decisão Interlocutória" or TipoDocumento == "Petição Inicial":
+    #Caso seja Decisão Interlocutória ou Petição Inicial
+    else:
         
         #analisa se existe condenação por honorários na sentença
         #(honor, chonor) = AnaliseHonorarios(docsearch, model=models['honorarios'], Verbose=Verbose, Resumo=Resumo)
@@ -339,6 +355,9 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
         
         #analisa se existe pedido de internação em UTI
         (interna, cinterna) = AnaliseInternacao(docsearch, model=models['internacao'], Verbose=Verbose, Resumo=Resumo)
+        
+        #analisa se existe realizacao de consultas exames ou procedimentos
+        (consultas, cconsultas) = AnaliseConsultasProcedimentos(docsearch, model=models['internacao'], Verbose=Verbose, Resumo=Resumo)
         
 
         # Detecta (usando REGEX) se existe outros itens alem de medicamentos na sentença
@@ -367,6 +386,7 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
         
         #lista contendo os nomes de medicamentos obtidos da sentença
         (lm, cmeds) = AnaliseMedicamentos(docsearch, model=models['medicamentos'], Verbose=Verbose, Resumo=Resumo)
+
 
         lm_busca = []
         lm_final = []
@@ -402,6 +422,7 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
         #preenche se houve condenação por honorários e se há outros itens além de medicamentos
         resposta['condenacao_honorarios'] = honor 
         resposta['internacao'] = interna
+        resposta['possui_consulta'] = consultas
         resposta['possui_outros'] = outros
         resposta['possui_outros_proibidos'] = outrosregex_proibidos
         
@@ -441,10 +462,15 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
 
 
         #custo total com LLMs
-        soma_prompt = sum([cdoutros[0], cmeds[0], chonor[0], CustoResumo[0], cinterna[0]])
-        soma_completion = sum([cdoutros[1], cmeds[1], chonor[1], CustoResumo[1], cinterna[1]])
+        soma_prompt = sum([cdoutros[0], cmeds[0], chonor[0], CustoResumo[0], cinterna[0],cconsultas[0]])
+        soma_completion = sum([cdoutros[1], cmeds[1], chonor[1], CustoResumo[1], cinterna[1],cconsultas[1]])
         resposta['custollm'] = CustoGpt4o(soma_prompt, soma_completion)
         resposta['tokensllm'] = (soma_prompt, soma_completion)
+        
+        exibe_dados(resposta)
+        
+        resposta['resumo_analise'] = str(resposta)
+        
         
 
         if Verbose:

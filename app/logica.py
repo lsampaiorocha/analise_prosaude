@@ -14,8 +14,25 @@ import os
 
 from datetime import datetime
 
+
+DB_PARAMS = {
+      'host': '192.168.2.64',
+      'database': 'db_pge',
+      'user': 'scm_robo',
+      'password': 'x6ZP&Fc45k(<',
+      'port': '5432'
+  }
+
+DATABASE_URL = f"postgresql://{DB_PARAMS['user']}:{DB_PARAMS['password']}@{DB_PARAMS['host']}:{DB_PARAMS['port']}/{DB_PARAMS['database']}"
+
+alfresco_url = "http://ccged.pge.ce.gov.br:8080"
+username = "ccportalprocurador"
+password = "aeH}ie0nar"
+parent_node_id = "bf4f65fc-ee14-46d7-afe1-7a680f01515d"  
+
+
 #Função para baixar o pdf no alfresco a partir do numero do processo
-def importar_autos_alfresco(n_processo,DATABASE_URL):  
+def importar_autos_alfresco(n_processo):  
       engine_alfresco = create_engine(DATABASE_URL)
       Session_alfresco = sessionmaker(bind=engine_alfresco)  
       metadata_alfresco = MetaData()
@@ -27,14 +44,6 @@ def importar_autos_alfresco(n_processo,DATABASE_URL):
       id_alfresco =  resultado_alfresco[1]
       
       session_alfresco.commit()
-
-      
-
-      alfresco_url = "http://ccged.pge.ce.gov.br:8080"
-      username = "ccportalprocurador"
-      password = "aeH}ie0nar"
-      parent_node_id = "bf4f65fc-ee14-46d7-afe1-7a680f01515d"
-
 
       download_url = f"{alfresco_url}/alfresco/api/-default-/public/alfresco/versions/1/nodes/{id_alfresco}/content"
       try:
@@ -94,16 +103,8 @@ def separar_pelo_id(path,id_andamento):
     return file_path,filename
 
 def primeira_pagina(n_processo,id_andamento):
-    DB_PARAMS = {
-        'host': '192.168.2.64',
-        'database': 'db_pge',
-        'user': 'scm_robo',
-        'password': 'x6ZP&Fc45k(<',
-        'port': '5432'
-        }
-
-    DATABASE_URL = f"postgresql://{DB_PARAMS['user']}:{DB_PARAMS['password']}@{DB_PARAMS['host']}:{DB_PARAMS['port']}/{DB_PARAMS['database']}"
-    path = importar_autos_alfresco(n_processo, DATABASE_URL)
+    
+    path = importar_autos_alfresco(n_processo)
     file_path,filename = separar_pelo_id(path,id_andamento)
     
     if file_path is None:
@@ -139,17 +140,6 @@ def importar_processos():
   Lógica da Rota para importar os processos de intimações cujos autos já tenham sido baixados pelos
   robô de distribuição de processos (tabela tb_autosprocessos) para a tabela tb_analiseportaria
   """ 
-  
-  DB_PARAMS = {
-      'host': '192.168.2.64',
-      'database': 'db_pge',
-      'user': 'scm_robo',
-      'password': 'x6ZP&Fc45k(<',
-      'port': '5432'
-  }
-  
-  
-  DATABASE_URL = f"postgresql://{DB_PARAMS['user']}:{DB_PARAMS['password']}@{DB_PARAMS['host']}:{DB_PARAMS['port']}/{DB_PARAMS['database']}"
   
   # Criar engine e sessão
   engine = create_engine(DATABASE_URL)
@@ -227,19 +217,7 @@ def analisar_marcados():
     - possuam o campo id_documento definido
   """
 
-  #Melhoria: Faça uma função para consertarem, se passarem um da maneira que não seja a padrão
 
-  #Função para salvar o processo na tabela tb_analiseportaria
-  DB_PARAMS = {
-      'host': '192.168.2.64',
-      'database': 'db_pge',
-      'user': 'scm_robo',
-      'password': 'x6ZP&Fc45k(<',
-      'port': '5432'
-  }
-
-  DATABASE_URL = f"postgresql://{DB_PARAMS['user']}:{DB_PARAMS['password']}@{DB_PARAMS['host']}:{DB_PARAMS['port']}/{DB_PARAMS['database']}"
-  
   # Criar engine e sessão
   engine = create_engine(DATABASE_URL)
   Session = sessionmaker(bind=engine)
@@ -252,6 +230,12 @@ def analisar_marcados():
       Column('id', Integer, primary_key=True),
       schema='scm_robo_intimacao'
   )
+  
+  tb_medicamentos = Table(
+    'tb_medicamentos', metadata,
+    Column('id', Integer, primary_key=True),
+    schema='scm_robo_intimacao'
+  )
 
   session = Session()
   # Pesquisa o processo em tb_analiseportaria
@@ -261,165 +245,17 @@ def analisar_marcados():
   for resultado in resultados:
       n_processo = resultado[0]     
       id_andamento = resultado[2]   
+      resposta = analisa(n_processo, id_andamento)
       
-      #Função para baixar o pdf no alfresco a partir do numero do processo
-      path = importar_autos_alfresco(n_processo,DATABASE_URL)
-     
-      if path is False:
-        return jsonify({"error":"Processo não encontrado no Alfresco!"}), 400  
-      
-      
-      # Função para separar a peça dado o id do documento
-      file_path,filename = separar_pelo_id(path,id_andamento)
-      
-      if file_path is None:
-        return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
-      
-      pdf_file = fitz.open(file_path)
-
-      with open(file_path, 'rb') as file:
-        pdf_content = file.read()
-
-      if len(pdf_content) == 0:
-        return jsonify({"error": "O arquivo enviado está vazio!"}), 400
-
-      pdf_filename = filename
-      file_path = os.path.join('temp', pdf_filename)      
-      
-      models = {
-      "honorarios" : "gpt-4o",
-      "doutros" : "gpt-4o",
-      "medicamentos" : "gpt-4o",
-      "alimentares" : "gpt-4o",
-      "internacao" : "gpt-4o",      
-      "resumo" : "gpt-4o",
-      "geral" : "gpt-4o"
-      }
-
-      # Aqui você pode processar o arquivo e o ID como quiser
-      resultado2 = AnalisePortaria(file_path, models, pdf_filename, Verbose=False) 
-      
-      if os.path.isfile(path):
-          os.remove(path) 
-
-      engine3 = create_engine(DATABASE_URL)
-      Session3 = sessionmaker(bind=engine3)
-
-      # Metadados globais
-      metadata = MetaData()
-
-      session3 = Session()
-
-      #RESUMO
-      tempRESUMO = resultado2['resumo']
-
-      
-      #TIPO DE DOCUMENTO
-      tempTIPODOCUMENTO = resultado2['tipo_documento']
-      
-      #APLICAÇÃO DE PORTARIA
-      tempAPLICAPORTARIA =any(resultado2['aplicacao_incisos'])
-      #if(True in tempAPLICAPORTARIA):
-      #    tempAPLICAPORTARIA = True
-
-      #MEDICAMENTOS
-      tempLISTA_MEDICAMENTOS = resultado2['lista_medicamentos']
-
-      if(len(tempLISTA_MEDICAMENTOS)>0):
-          tempPOSSUI_MEDICAMENTOS = True
+      if isinstance(resposta, dict):
+          grava_resultado_BD(n_processo, id_andamento, resposta, session)
       else:
-          tempPOSSUI_MEDICAMENTOS = False
-
-      #INTERNAÇÃO
-      tempINTERNACAO = False if resultado2['internacao'] is None else resultado2['internacao']
+          return jsonify(resposta), 400
   
-
-      #CONSULTAS, EXAMES, PROCEDIMENTOS
-      tempCEP = resultado2['lista_intervencoes']
-      if(len(tempCEP)>0):
-          tempPOSSUI_CEP = True
-      else:
-          tempPOSSUI_CEP = False
-
-      #INSULINA
-      tempINSULINA = resultado2['lista_glicemico']
-      if(len(tempINSULINA)>0):
-          tempPOSSUI_INSULINA = True
-      else:
-          tempPOSSUI_INSULINA = False
-
-      #INSUMOS
-      tempINSUMOS = resultado2['lista_insumos']
-      if(len(tempINSUMOS)>0):
-          tempPOSSUI_INSUMOS = True
-      else:
-          tempPOSSUI_INSUMOS = False
-
-      #MULTIDISCIPLINAR
-      tempMULTI = resultado2['lista_tratamento']
-      if(len(tempMULTI)>0):
-          tempPOSSUI_MULTI = True
-      else:
-          tempPOSSUI_MULTI = False
-      
-      #CUSTEIO
-      tempCUSTEIO = False if resultado2['respeita_valor_teto'] is None else resultado2['respeita_valor_teto']
-      #COMPOSTOS
-      tempCOMPOSTOS = resultado2['lista_compostos']
-      if(len(tempCOMPOSTOS)>0):
-          tempPOSSUI_COMPOSTOS = True
-      else:
-          tempPOSSUI_COMPOSTOS = False
-
-      #DANOS MORAIS
-      tempDANOS_MORAIS = False if resultado2['indenizacao'] is None else resultado2['indenizacao']
-      
-      #CONDENAÇÃO POR HONORÁRIOS
-      tempCOND_HONOR = False if resultado2['condenacao_honorarios'] is None else resultado2['condenacao_honorarios']
-      
-      #OUTROS
-      tempPOSSUI_OUTROS = False if resultado2['possui_outros'] is None else resultado2['possui_outros']
-      tempLISTA_OUTROS = resultado2['lista_outros']
-      
-      #CUSTO ANÁLISE
-      tempCUSTO = resultado2['custollm']
-      
-      #ATUALIZAÇÃO COM OS RESULTADOS DA ANÁLISE
-      textosql = text(F"UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria ta SET tipo_documento = :tipo_documento, analisado = :analisado, aplica_portaria = :aplica_portaria, possui_medicamentos = :possui_medicamentos, possui_internacao = :possui_internacao, possui_consultas_exames_procedimentos = :possui_consultas_exames_procedimentos, possui_insulina = :possui_insulina, possui_insumos = :possui_insumos, possui_multidisciplinar = :possui_multidisciplinar, possui_custeio = :possui_custeio, possui_compostos = :possui_compostos, possui_condenacao_honorarios = :possui_condenacao_honorarios,  possui_danos_morais = :possui_danos_morais, lista_outros = :lista_outros, custo_analise = :custo_analise, resumo =:resumo,marcado_analisar =:marcado_analisar, dt_analisado =:dt_analisado,id_documento_analisado =:id_analisado WHERE ta.numerounico=:numero_processo")
-
-      inserir = session3.execute(textosql,{'tipo_documento':f'{tempTIPODOCUMENTO}','analisado':True,'aplica_portaria':f'{tempAPLICAPORTARIA}','possui_medicamentos':f'{tempPOSSUI_MEDICAMENTOS}','possui_internacao':f'{tempINTERNACAO}','possui_consultas_exames_procedimentos':f'{tempPOSSUI_CEP}','possui_insulina':f'{tempPOSSUI_INSULINA}','possui_insumos':f'{tempPOSSUI_INSUMOS}','possui_multidisciplinar':f'{tempPOSSUI_MULTI}','possui_custeio':f'{tempCUSTEIO}','possui_compostos':f'{tempPOSSUI_COMPOSTOS}','possui_condenacao_honorarios':f'{tempCOND_HONOR}','possui_danos_morais':f'{tempDANOS_MORAIS}','lista_outros':f'{tempLISTA_OUTROS}','custo_analise':f'{tempCUSTO}','numero_processo':f'{n_processo}','resumo':f'{tempRESUMO}','marcado_analisar' : True,'dt_analisado':datetime.now(),'id_analisado' : id_andamento})
-
-      #INSERÇÃO NA TABELA DE MEDICAMENTOS
-      for i in range(0,len(tempLISTA_MEDICAMENTOS)):
-          #id do análise portaria
-          textosql1 = text(f"SELECT * from db_pge.scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numero_processo")
-          buscaidportaria = session3.execute(textosql1,{'numero_processo':f'{n_processo}'})
-          idportaria = buscaidportaria[0]
-          #último id inserido
-          buscaultimoid = session3.execute("SELECT * from tb_medicamentos tm ORDER BY tm.id")
-          if(buscaultimoid == None):
-              idmedicamento = 800
-          else:
-              idmedicamento = buscaultimoid[0] + 1
-          
-          nome_extraido = tempLISTA_MEDICAMENTOS[i]['nome_extraido']
-          nome_principio = tempLISTA_MEDICAMENTOS[i]['nome_principio']
-          nome_comercial = tempLISTA_MEDICAMENTOS[i]['nome_comercial']
-          dosagem = tempLISTA_MEDICAMENTOS[i]['dosagem']
-          registroanvisa = tempLISTA_MEDICAMENTOS[i]['registro_anvisa']
-          if(registroanvisa != None):
-              possuianvisa = True
-          ofertaSUS = tempLISTA_MEDICAMENTOS[i]['oferta_SUS']
-          if(ofertaSUS == None):
-              ofertaSUS = False
-          precoPMVG = tempLISTA_MEDICAMENTOS[i]['preco_PMVG'].replace('R$','')
-
-          insercaoAM = session3.execute(text('INSERT into db_pge.scm_robo_intimacao.tb_medicamentos (id, id_analiseportaria, nome_principio, nome_comercial, dosagem, possui_anvisa, registro_anvisa, fornecido_SUS, valor) values(:id, :id_analiseportaria, :nome_principio, :nome_comercial, :dosagem, :possui_anvisa, :registro_anvisa, :fornecido_SUS, :valor)'),{'id':f'{idmedicamento}','id_analiseportaria':f'{idportaria}','nome_principio':f'{nome_principio}','nome_comercial':f'{nome_comercial}','dosagem':f'{dosagem}','possui_anvisa':f'{possuianvisa}','registro_anvisa':f'{registroanvisa}','fornecido_SUS':f'{ofertaSUS}','valor':f'{precoPMVG}'})
-      session3.commit()
-
-      
   # Retorna a resposta com o resultado do processamento
-  return jsonify({"message": "Processo atualizado com sucesso."}), 200
+  return jsonify({"message": "Processos analisados com sucesso."}), 200
+      
+  
       
 def analisar_processo(numero_processo):
   """
@@ -442,16 +278,7 @@ def analisar_processo(numero_processo):
   numero_processo = request.form.get('numero_processo')
   #TODO: Verificar casos em que o número não tenha sido passado no formato padrão
   
-  DB_PARAMS = {
-      'host': '192.168.2.64',
-      'database': 'db_pge',
-      'user': 'scm_robo',
-      'password': 'x6ZP&Fc45k(<',
-      'port': '5432'
-  }
 
-  DATABASE_URL = f"postgresql://{DB_PARAMS['user']}:{DB_PARAMS['password']}@{DB_PARAMS['host']}:{DB_PARAMS['port']}/{DB_PARAMS['database']}"
-  
   # Criar engine e sessão
   engine = create_engine(DATABASE_URL)
   Session = sessionmaker(bind=engine)
@@ -467,197 +294,163 @@ def analisar_processo(numero_processo):
 
   session = Session()
   # Pesquisa o processo em tb_analiseportaria
-  query = text('SELECT numerounico,marcado_analisar,id_documento_analisado,analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso')
-  ta.analisado is not true
+  query = text('SELECT numerounico,marcado_analisar,id_documento_analisado,analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso and ta.analisado is not true and ta.marcado_analisar is true and ta.id_documento_analisado is not null')
+  #ta.analisado is not true
   resultado = session.execute(query, {"numeroprocesso":numero_processo}).fetchone()
   n_processo =  resultado[0]
-  marcado_analisar = resultado[1]
   id_andamento = resultado[2]
-  processo_analisado = resultado[3]
-  if not n_processo:
-      return jsonify({"error":"Processo não encontrado na Tabela!"}), 400
-  if marcado_analisar is not True:
-      return jsonify({"error":"Processo não foi marcado para analisar!"}), 400
-  if not id_andamento:
-      return jsonify({"error":"Não foi passado o id do Andamento!"}), 400
-  if processo_analisado is True:
-      return jsonify({"error":"Processo já analisado"}), 400
 
-  # Função para capturar o id do alfresco através do número do processo        
-  path = importar_autos_alfresco(n_processo,DATABASE_URL)
-  if path is False:
-    return jsonify({"error":"Processo não encontrado no Alfresco!"}), 400  
+  resposta = analisa(n_processo, id_andamento)
   
-  # Função para separar a peça dado o id do documento
-  file_path,filename = separar_pelo_id(path,id_andamento)
-  
-  if file_path is None:
-        return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
-
-  pdf_file = fitz.open(file_path)
-
-  with open(file_path, 'rb') as file:
-      pdf_content = file.read()
-
-  if len(pdf_content) == 0:
-      return jsonify({"error": "O arquivo enviado está vazio!"}), 400
-  
-  pdf_filename = filename
-  file_path = os.path.join('temp', pdf_filename)
-
-  
-  
-  models = {
-    "honorarios" : "gpt-4o",
-    "doutros" : "gpt-4o",
-    "medicamentos" : "gpt-4o",
-    "alimentares" : "gpt-4o",
-    "internacao" : "gpt-4o",      
-    "resumo" : "gpt-4o",
-    "geral" : "gpt-4o"
-  }
-  
-
-  resultado = AnalisePortaria(file_path, models, pdf_filename, Verbose=False) 
-  
-  #if os.path.isfile(path):
-  #    os.remove(path) 
-  
-  if os.path.isfile(file_path):
-      os.remove(file_path) 
-
-
-  engine = create_engine(DATABASE_URL)
-  Session = sessionmaker(bind=engine)
-
-  # Metadados globais
-  metadata = MetaData()
-
-  session = Session()
-
-  #RESUMO
-  tempRESUMO = resultado['resumo']
-
-  
-  #TIPO DE DOCUMENTO
-  tempTIPODOCUMENTO = resultado['tipo_documento']
-  
-  #APLICAÇÃO DE PORTARIA
-  tempAPLICAPORTARIA =any(resultado['aplicacao_incisos'])
-  #if(True in tempAPLICAPORTARIA):
-  #    tempAPLICAPORTARIA = True
-
-  #MEDICAMENTOS
-  tempLISTA_MEDICAMENTOS = resultado['lista_medicamentos']
-
-  if(len(tempLISTA_MEDICAMENTOS)>0):
-      tempPOSSUI_MEDICAMENTOS = True
+  if isinstance(resposta, dict):
+    grava_resultado_BD(n_processo, id_andamento, resposta, session)
   else:
-      tempPOSSUI_MEDICAMENTOS = False
-
-  #INTERNAÇÃO
-  tempINTERNACAO = False if resultado['internacao'] is None else resultado['internacao']
-
-
-  #CONSULTAS, EXAMES, PROCEDIMENTOS
-  tempCEP = resultado['lista_intervencoes']
-  if(len(tempCEP)>0):
-      tempPOSSUI_CEP = True
-  else:
-      tempPOSSUI_CEP = False
-
-  #INSULINA
-  tempINSULINA = resultado['lista_glicemico']
-  if(len(tempINSULINA)>0):
-      tempPOSSUI_INSULINA = True
-  else:
-      tempPOSSUI_INSULINA = False
-
-  #INSUMOS
-  tempINSUMOS = resultado['lista_insumos']
-  if(len(tempINSUMOS)>0):
-      tempPOSSUI_INSUMOS = True
-  else:
-      tempPOSSUI_INSUMOS = False
-
-  #MULTIDISCIPLINAR
-  tempMULTI = resultado['lista_tratamento']
-  if(len(tempMULTI)>0):
-      tempPOSSUI_MULTI = True
-  else:
-      tempPOSSUI_MULTI = False
-  
-  #CUSTEIO
-  tempCUSTEIO = False if resultado['respeita_valor_teto'] is None else resultado['respeita_valor_teto']
-  #COMPOSTOS
-  tempCOMPOSTOS = resultado['lista_compostos']
-  if(len(tempCOMPOSTOS)>0):
-      tempPOSSUI_COMPOSTOS = True
-  else:
-      tempPOSSUI_COMPOSTOS = False
-
-  #DANOS MORAIS
-  tempDANOS_MORAIS = False if resultado['indenizacao'] is None else resultado['indenizacao']
-  
-  #CONDENAÇÃO POR HONORÁRIOS
-  tempCOND_HONOR = False if resultado['condenacao_honorarios'] is None else resultado['condenacao_honorarios']
-  
-  #OUTROS
-  tempPOSSUI_OUTROS = False if resultado['possui_outros'] is None else resultado['possui_outros']
-  tempLISTA_OUTROS = resultado['lista_outros']
-  
-  #CUSTO ANÁLISE
-  tempCUSTO = resultado['custollm']
-  
-  #ATUALIZAÇÃO COM OS RESULTADOS DA ANÁLISE
-  textosql = text(F"UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria ta SET tipo_documento = :tipo_documento, analisado = :analisado, aplica_portaria = :aplica_portaria, possui_medicamentos = :possui_medicamentos, possui_internacao = :possui_internacao, possui_consultas_exames_procedimentos = :possui_consultas_exames_procedimentos, possui_insulina = :possui_insulina, possui_insumos = :possui_insumos, possui_multidisciplinar = :possui_multidisciplinar, possui_custeio = :possui_custeio, possui_compostos = :possui_compostos, possui_condenacao_honorarios = :possui_condenacao_honorarios,  possui_danos_morais = :possui_danos_morais, lista_outros = :lista_outros, custo_analise = :custo_analise, resumo =:resumo,marcado_analisar =:marcado_analisar, dt_analisado =:dt_analisado,id_documento_analisado =:id_analisado WHERE ta.numerounico=:numero_processo")
-
-  inserir = session.execute(textosql,{'tipo_documento':f'{tempTIPODOCUMENTO}','analisado':True,'aplica_portaria':f'{tempAPLICAPORTARIA}','possui_medicamentos':f'{tempPOSSUI_MEDICAMENTOS}','possui_internacao':f'{tempINTERNACAO}','possui_consultas_exames_procedimentos':f'{tempPOSSUI_CEP}','possui_insulina':f'{tempPOSSUI_INSULINA}','possui_insumos':f'{tempPOSSUI_INSUMOS}','possui_multidisciplinar':f'{tempPOSSUI_MULTI}','possui_custeio':f'{tempCUSTEIO}','possui_compostos':f'{tempPOSSUI_COMPOSTOS}','possui_condenacao_honorarios':f'{tempCOND_HONOR}','possui_danos_morais':f'{tempDANOS_MORAIS}','lista_outros':f'{tempLISTA_OUTROS}','custo_analise':f'{tempCUSTO}','numero_processo':f'{numero_processo}','resumo':f'{tempRESUMO}','marcado_analisar' : True,'dt_analisado':datetime.now(),'id_analisado' : id_andamento})
-
-  #INSERÇÃO NA TABELA DE MEDICAMENTOS
-  for i in range(0,len(tempLISTA_MEDICAMENTOS)):
-      #id do análise portaria
-      textosql1 = text(f"SELECT * from db_pge.scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numero_processo")
-      buscaidportaria = session.execute(textosql1,{'numero_processo':f'{numero_processo}'})
-      idportaria = buscaidportaria[0]
-      #último id inserido
-      buscaultimoid = session.execute("SELECT * from tb_medicamentos tm ORDER BY tm.id")
-      if(buscaultimoid == None):
-          idmedicamento = 800
-      else:
-          idmedicamento = buscaultimoid[0] + 1
-      
-      nome_extraido = tempLISTA_MEDICAMENTOS[i]['nome_extraido']
-      nome_principio = tempLISTA_MEDICAMENTOS[i]['nome_principio']
-      nome_comercial = tempLISTA_MEDICAMENTOS[i]['nome_comercial']
-      dosagem = tempLISTA_MEDICAMENTOS[i]['dosagem']
-      registroanvisa = tempLISTA_MEDICAMENTOS[i]['registro_anvisa']
-      if(registroanvisa != None):
-          possuianvisa = True
-      ofertaSUS = tempLISTA_MEDICAMENTOS[i]['oferta_SUS']
-      if(ofertaSUS == None):
-          ofertaSUS = False
-      precoPMVG = tempLISTA_MEDICAMENTOS[i]['preco_PMVG'].replace('R$','')
-
-      insercaoAM = session.execute(text('INSERT into db_pge.scm_robo_intimacao.tb_medicamentos (id, id_analiseportaria, nome_principio, nome_comercial, dosagem, possui_anvisa, registro_anvisa, fornecido_SUS, valor) values(:id, :id_analiseportaria, :nome_principio, :nome_comercial, :dosagem, :possui_anvisa, :registro_anvisa, :fornecido_SUS, :valor)'),{'id':f'{idmedicamento}','id_analiseportaria':f'{idportaria}','nome_principio':f'{nome_principio}','nome_comercial':f'{nome_comercial}','dosagem':f'{dosagem}','possui_anvisa':f'{possuianvisa}','registro_anvisa':f'{registroanvisa}','fornecido_SUS':f'{ofertaSUS}','valor':f'{precoPMVG}'})
-  session.commit()
-
+    return resposta
   
   # Retorna a resposta com o resultado do processamento
   return jsonify({"message": "Processo atualizado com sucesso."}), 200
 
+
+def analisa(n_processo, id_andamento):
+      """
+      Lógica que recebe número único do processo e id do documento e chama
+      o robô de análise para gerar o dicionário com todas as informações
+      """    
+      #Função para baixar o pdf no alfresco a partir do numero do processo
+      path = importar_autos_alfresco(n_processo)
+     
+      if path is False:
+        return jsonify({"error":"Processo não encontrado no Alfresco!"}), 400  
+      
+      # Função para separar a peça dado o id do documento
+      file_path,filename = separar_pelo_id(path,id_andamento)
+      
+      if file_path is None:
+        return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
+      
+      #pdf_file = fitz.open(file_path)
+
+      with open(file_path, 'rb') as file:
+        pdf_content = file.read()
+
+      if len(pdf_content) == 0:
+        return jsonify({"error": "O arquivo enviado está vazio!"}), 400
+
+      pdf_filename = filename
+      file_path = os.path.join('temp', pdf_filename)      
+      
+      models = {
+      "honorarios" : "gpt-4o",
+      "doutros" : "gpt-4o",
+      "medicamentos" : "gpt-4o",
+      "alimentares" : "gpt-4o",
+      "internacao" : "gpt-4o",      
+      "resumo" : "gpt-4o",
+      "geral" : "gpt-4o"
+      }
+
+      resposta = AnalisePortaria(file_path, models, pdf_filename, Verbose=True) 
+      
+      if os.path.isfile(path):
+          os.remove(path) 
+      
+      return resposta
+
+
+
+def grava_resultado_BD(n_processo, id_andamento, resultado, session):
+
+    # ATUALIZAÇÃO COM OS RESULTADOS DA ANÁLISE
+    textosql = text(f"""
+        UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria ta 
+        SET tipo_documento = :tipo_documento, 
+        analisado = :analisado, 
+        aplica_portaria = :aplica_portaria, 
+        possui_medicamentos = :possui_medicamentos, 
+        possui_internacao = :possui_internacao, 
+        possui_consultas_exames_procedimentos = :possui_consultas_exames_procedimentos, 
+        possui_insulina = :possui_insulina, 
+        possui_insumos = :possui_insumos, 
+        possui_multidisciplinar = :possui_multidisciplinar, 
+        possui_custeio = :possui_custeio, 
+        possui_compostos = :possui_compostos, 
+        possui_condenacao_honorarios = :possui_condenacao_honorarios,  
+        possui_danos_morais = :possui_danos_morais, 
+        lista_outros = :lista_outros, 
+        custo_analise = :custo_analise, 
+        input_tokens = :input_tokens,
+        completion_tokens = :completion_tokens,
+        resumo =:resumo, 
+        resumo_analise =:resumo_analise,
+        marcado_analisar =:marcado_analisar, 
+        dt_analisado =:dt_analisado, 
+        id_documento_analisado =:id_analisado 
+        WHERE ta.numerounico=:numero_processo
+    """)
+
+    session.execute(textosql, {
+        'tipo_documento': resultado['tipo_documento'],
+        'analisado': True,
+        'aplica_portaria': any(resultado['aplicacao_incisos']),
+        'possui_medicamentos': len(resultado['lista_medicamentos']) > 0,
+        'possui_internacao': resultado['internacao'] if resultado['internacao'] is not None else False,
+        'possui_consultas_exames_procedimentos': resultado['possui_consulta'] if resultado['possui_consulta'] is not None else False,
+        'possui_insulina': len(resultado['lista_glicemico']) > 0,
+        'possui_insumos': len(resultado['lista_insumos']) > 0,
+        'possui_multidisciplinar': len(resultado['lista_tratamento']) > 0,
+        'possui_custeio': resultado['possui_custeio'] if resultado['possui_custeio'] is not None else False,
+        'possui_compostos': len(resultado['lista_compostos']) > 0,
+        'possui_condenacao_honorarios': resultado['condenacao_honorarios'] if resultado['condenacao_honorarios'] is not None else False,
+        'possui_danos_morais': resultado['indenizacao'] if resultado['indenizacao'] is not None else False,
+        'respeita_valor_teto': resultado['respeita_valor_teto'] if resultado['respeita_valor_teto'] is not None else False,
+        'lista_outros': resultado['lista_outros'],
+        'custo_analise': resultado['custollm'],
+        'input_tokens': resultado['tokensllm'][0],
+        'completion_tokens': resultado['tokensllm'][1],
+        'numero_processo': n_processo,
+        'resumo': resultado['resumo'],
+        'resumo_analise': resultado['resumo_analise'],
+        'marcado_analisar': True,
+        'dt_analisado': datetime.now(),
+        'id_analisado': id_andamento
+    })
+
+    # INSERÇÃO NA TABELA DE MEDICAMENTOS
+    for medicamento in resultado['lista_medicamentos']:
+        textosql1 = text("SELECT * from db_pge.scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numero_processo")
+        buscaidportaria = session.execute(textosql1, {'numero_processo': n_processo}).fetchone()
+        idportaria = buscaidportaria[0]
+        
+        buscaultimoid = session.execute(text("SELECT MAX(tm.id) from db_pge.scm_robo_intimacao.tb_medicamentos tm")).fetchone()
+        idmedicamento = (buscaultimoid[0] or 799) + 1
+
+        insercaoAM = session.execute(text("""
+            INSERT into db_pge.scm_robo_intimacao.tb_medicamentos 
+            (id, id_analiseportaria, nome_principio, nome_comercial, dosagem, possui_anvisa, registro_anvisa, fornecido_SUS, valor) 
+            values(:id, :id_analiseportaria, :nome_principio, :nome_comercial, :dosagem, :possui_anvisa, :registro_anvisa, :fornecido_SUS, :valor)
+        """), {
+            'id': idmedicamento,
+            'id_analiseportaria': idportaria,
+            'nome_principio': medicamento['nome_principio'],
+            'nome_comercial': medicamento['nome_comercial'],
+            'dosagem': medicamento['dosagem'],
+            'possui_anvisa': medicamento['registro_anvisa'] is not None,
+            'registro_anvisa': medicamento['registro_anvisa'],
+            'fornecido_SUS': medicamento['oferta_SUS'] or False,
+            'valor': medicamento['preco_PMVG'].replace('R$', '')
+        })
+    session.commit()
+
+
+
+
+
+
+
+
 def captura_ids_processo(n_processo):
 
-    DB_PARAMS = {
-        'host': '192.168.2.64',
-        'database': 'db_pge',
-        'user': 'scm_robo',
-        'password': 'x6ZP&Fc45k(<',
-        'port': '5432'
-        }
-
-    DATABASE_URL = f"postgresql://{DB_PARAMS['user']}:{DB_PARAMS['password']}@{DB_PARAMS['host']}:{DB_PARAMS['port']}/{DB_PARAMS['database']}"
-    path = importar_autos_alfresco(n_processo, DATABASE_URL)
+    path = importar_autos_alfresco(n_processo)
     #Função para capturar o id_analise portaria dado o número do processo
     engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
@@ -705,5 +498,175 @@ def captura_ids_processo(n_processo):
         os.remove(path) 
     return True
 
-if __name__ == '__main__':
- _,_ = primeira_pagina('3000431-69.2024.8.06.0043','87423365')
+
+
+"""
+def grava_resultado_BD(n_processo, id_andamento, resultado, session):
+
+    #RESUMO
+    tempRESUMO = resultado['resumo']
+
+    
+    #TIPO DE DOCUMENTO
+    tempTIPODOCUMENTO = resultado['tipo_documento']
+    
+    #APLICAÇÃO DE PORTARIA
+    tempAPLICAPORTARIA =any(resultado['aplicacao_incisos'])
+    #if(True in tempAPLICAPORTARIA):
+    #    tempAPLICAPORTARIA = True
+
+    #MEDICAMENTOS
+    tempLISTA_MEDICAMENTOS = resultado['lista_medicamentos']
+
+    if(len(tempLISTA_MEDICAMENTOS)>0):
+        tempPOSSUI_MEDICAMENTOS = True
+    else:
+        tempPOSSUI_MEDICAMENTOS = False
+
+    #INTERNAÇÃO
+    tempINTERNACAO = False if resultado['internacao'] is None else resultado['internacao']
+
+
+    #CONSULTAS, EXAMES, PROCEDIMENTOS
+    tempCEP = resultado['lista_intervencoes']
+    if(len(tempCEP)>0):
+        tempPOSSUI_CEP = True
+    else:
+        tempPOSSUI_CEP = False
+
+    #INSULINA
+    tempINSULINA = resultado['lista_glicemico']
+    if(len(tempINSULINA)>0):
+        tempPOSSUI_INSULINA = True
+    else:
+        tempPOSSUI_INSULINA = False
+
+    #INSUMOS
+    tempINSUMOS = resultado['lista_insumos']
+    if(len(tempINSUMOS)>0):
+        tempPOSSUI_INSUMOS = True
+    else:
+        tempPOSSUI_INSUMOS = False
+
+    #MULTIDISCIPLINAR
+    tempMULTI = resultado['lista_tratamento']
+    if(len(tempMULTI)>0):
+        tempPOSSUI_MULTI = True
+    else:
+        tempPOSSUI_MULTI = False
+    
+    #TETO
+    tempTETO = False if resultado['respeita_valor_teto'] is None else resultado['respeita_valor_teto']
+
+    #CUSTEIO
+    tempCUSTEIO = False if resultado['possui_custeio'] is None else resultado['possui_custeio']
+
+    #COMPOSTOS
+    tempCOMPOSTOS = resultado['lista_compostos']
+    if(len(tempCOMPOSTOS)>0):
+        tempPOSSUI_COMPOSTOS = True
+    else:
+        tempPOSSUI_COMPOSTOS = False
+
+    #DANOS MORAIS
+    tempDANOS_MORAIS = False if resultado['indenizacao'] is None else resultado['indenizacao']
+    
+    #CONDENAÇÃO POR HONORÁRIOS
+    tempCOND_HONOR = False if resultado['condenacao_honorarios'] is None else resultado['condenacao_honorarios']
+    
+    #OUTROS
+    tempPOSSUI_OUTROS = False if resultado['possui_outros'] is None else resultado['possui_outros']
+    tempLISTA_OUTROS = resultado['lista_outros']
+    
+    #OUTROS
+    tempPOSSUI_OUTROS_IMPEDITIVOS = False if resultado['possui_outros_proibidos'] is None else resultado['possui_outros_proibidos']
+    
+    #CUSTO ANÁLISE
+    tempCUSTO = resultado['custollm']
+    
+    #ATUALIZAÇÃO COM OS RESULTADOS DA ANÁLISE
+    textosql = text(F"UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria ta SET tipo_documento = :tipo_documento, analisado = :analisado, aplica_portaria = :aplica_portaria, possui_medicamentos = :possui_medicamentos, possui_internacao = :possui_internacao, possui_consultas_exames_procedimentos = :possui_consultas_exames_procedimentos, possui_insulina = :possui_insulina, possui_insumos = :possui_insumos, possui_multidisciplinar = :possui_multidisciplinar, possui_custeio = :possui_custeio, possui_compostos = :possui_compostos, possui_condenacao_honorarios = :possui_condenacao_honorarios,  possui_danos_morais = :possui_danos_morais, lista_outros = :lista_outros, custo_analise = :custo_analise, resumo =:resumo,marcado_analisar =:marcado_analisar, dt_analisado =:dt_analisado,id_documento_analisado =:id_analisado WHERE ta.numerounico=:numero_processo")
+
+    '''
+    inserir = session.execute(textosql,{
+        'tipo_documento':f'{tempTIPODOCUMENTO}',
+        'analisado':True,
+        'aplica_portaria':f'{tempAPLICAPORTARIA}',
+        'possui_medicamentos':f'{tempPOSSUI_MEDICAMENTOS}',
+        'possui_internacao':f'{tempINTERNACAO}',
+        'possui_consultas_exames_procedimentos':f'{tempPOSSUI_CEP}',
+        'possui_insulina':f'{tempPOSSUI_INSULINA}',
+        'possui_insumos':f'{tempPOSSUI_INSUMOS}',
+        'possui_multidisciplinar':f'{tempPOSSUI_MULTI}',
+        'possui_custeio':f'{tempCUSTEIO}',
+        'possui_compostos':f'{tempPOSSUI_COMPOSTOS}',
+        'possui_outros':f'{tempPOSSUI_OUTROS}',
+        'possui_outros_impeditivos':f'{tempPOSSUI_OUTROS_IMPEDITIVOS}',
+        'possui_condenacao_honorarios':f'{tempCOND_HONOR}',
+        'possui_danos_morais':f'{tempDANOS_MORAIS}',
+        'respeita_valor_teto':{tempTETO} ,
+        'lista_outros':f'{tempLISTA_OUTROS}',
+        'custo_analise':f'{tempCUSTO}',
+        'numero_processo':f'{n_processo}',
+        'resumo':f'{tempRESUMO}',
+        'marcado_analisar' : True,
+        'dt_analisado':datetime.now(),
+        'id_analisado' : id_andamento})
+    '''
+    
+    inserir = session.execute(textosql,{
+        'tipo_documento':f'{tempTIPODOCUMENTO}',
+        'analisado':True,
+        'aplica_portaria':tempAPLICAPORTARIA,
+        'possui_medicamentos':tempPOSSUI_MEDICAMENTOS,
+        'possui_internacao':tempINTERNACAO,
+        'possui_consultas_exames_procedimentos':tempPOSSUI_CEP,
+        'possui_insulina':tempPOSSUI_INSULINA,
+        'possui_insumos':tempPOSSUI_INSUMOS,
+        'possui_multidisciplinar':tempPOSSUI_MULTI,
+        'possui_custeio':tempCUSTEIO,
+        'possui_compostos':tempPOSSUI_COMPOSTOS,
+        'possui_outros':tempPOSSUI_OUTROS,
+        'possui_outros_impeditivos':tempPOSSUI_OUTROS_IMPEDITIVOS,
+        'possui_condenacao_honorarios':tempCOND_HONOR,
+        'possui_danos_morais':tempDANOS_MORAIS,
+        'respeita_valor_teto':tempTETO,
+        'lista_outros':f'{tempLISTA_OUTROS}',
+        'custo_analise':f'{tempCUSTO}',
+        'numero_processo':f'{n_processo}',
+        'resumo':f'{tempRESUMO}',
+        'marcado_analisar' : True,
+        'dt_analisado':datetime.now(),
+        'id_analisado' : id_andamento,
+        'resumo_analise': resultado['resumo_analise']})
+    
+
+    #INSERÇÃO NA TABELA DE MEDICAMENTOS
+    for i in range(0,len(tempLISTA_MEDICAMENTOS)):
+        #id do análise portaria
+        textosql1 = text(f"SELECT * from db_pge.scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numero_processo")
+        buscaidportaria = session.execute(textosql1,{'numero_processo':f'{n_processo}'})
+        idportaria = buscaidportaria[0]
+        #último id inserido
+        buscaultimoid = session.execute("SELECT * from tb_medicamentos tm ORDER BY tm.id")
+        if(buscaultimoid == None):
+            idmedicamento = 800
+        else:
+            idmedicamento = buscaultimoid[0] + 1
+        
+        nome_extraido = tempLISTA_MEDICAMENTOS[i]['nome_extraido']
+        nome_principio = tempLISTA_MEDICAMENTOS[i]['nome_principio']
+        nome_comercial = tempLISTA_MEDICAMENTOS[i]['nome_comercial']
+        dosagem = tempLISTA_MEDICAMENTOS[i]['dosagem']
+        registroanvisa = tempLISTA_MEDICAMENTOS[i]['registro_anvisa']
+        if(registroanvisa != None):
+            possuianvisa = True
+        ofertaSUS = tempLISTA_MEDICAMENTOS[i]['oferta_SUS']
+        if(ofertaSUS == None):
+            ofertaSUS = False
+        precoPMVG = tempLISTA_MEDICAMENTOS[i]['preco_PMVG'].replace('R$','')
+
+        insercaoAM = session.execute(text('INSERT into db_pge.scm_robo_intimacao.tb_medicamentos (id, id_analiseportaria, nome_principio, nome_comercial, dosagem, possui_anvisa, registro_anvisa, fornecido_SUS, valor) values(:id, :id_analiseportaria, :nome_principio, :nome_comercial, :dosagem, :possui_anvisa, :registro_anvisa, :fornecido_SUS, :valor)'),{'id':f'{idmedicamento}','id_analiseportaria':f'{idportaria}','nome_principio':f'{nome_principio}','nome_comercial':f'{nome_comercial}','dosagem':f'{dosagem}','possui_anvisa':f'{possuianvisa}','registro_anvisa':f'{registroanvisa}','fornecido_SUS':f'{ofertaSUS}','valor':f'{precoPMVG}'})
+    session.commit()
+
+"""
