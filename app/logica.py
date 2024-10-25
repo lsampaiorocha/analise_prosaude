@@ -102,6 +102,37 @@ def separar_pelo_id(path,id_andamento):
     pdf_document.close()
     return file_path,filename
 
+
+# Função que irá identificar a primeira página do documento a ser analisado pela portaria
+def identificar_primeira_pagina(n_processo,id_andamento):
+    
+    path = importar_autos_alfresco(n_processo)
+    
+    if not path:
+        return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
+    
+    pdf_document = fitz.open(path)
+    
+    # Variável para armazenar o número da primeira página encontrada
+    primeira_pagina = None
+
+    for page_num in range(len(pdf_document)):
+        page = pdf_document.load_page(page_num)
+        text = page.get_text()
+
+        # Verifica se a identificação do andamento está na página
+        if f"Num. {id_andamento} - Pág." in text:
+            primeira_pagina = page_num
+            break  # Interrompe o loop após encontrar a primeira ocorrência
+
+    pdf_document.close()
+    
+    # Retorna o número da primeira página encontrada, ou None se não encontrado
+    return primeira_pagina
+
+
+"""
+#Função para obter a primeira página de um 
 def primeira_pagina(n_processo,id_andamento):
     
     path = importar_autos_alfresco(n_processo)
@@ -133,6 +164,8 @@ def primeira_pagina(n_processo,id_andamento):
     new_pdf.close()
     pdf_document.close()
     return file_path,filename
+"""
+
 
 def importar_processos():
   
@@ -202,7 +235,9 @@ def importar_processos():
       
       resultado1 =(temppk,tempfk,tempNU,tempCA,tempbase,tempdtproc)
   
-      insercao = session.execute(text('INSERT into scm_robo_intimacao.tb_analiseportaria (id, fk_autosprosaude, numerounico, caminho, base, dt_processado) values(:id,:fk_autosprosaude,:numerounico,:caminho,:base,:dt_processado)'),{'id':f'{temppk}','fk_autosprosaude':f'{tempfk}','numerounico':f'{tempNU}','caminho':f'{tempCA}','base':f'{tempbase}','dt_processado':f'{tempdtproc}'})    
+      insercao = session.execute(text('INSERT into scm_robo_intimacao.tb_analiseportaria (id, fk_autosprosaude, numerounico, caminho, base, dt_processado) values(:id,:fk_autosprosaude,:numerounico,:caminho,:base,:dt_processado)'),{'id':f'{temppk}','fk_autosprosaude':f'{tempfk}','numerounico':f'{tempNU}','caminho':f'{tempCA}','base':f'{tempbase}','dt_processado':f'{tempdtproc}'})
+      
+      ############    
 
   session.commit()
 
@@ -443,13 +478,11 @@ def grava_resultado_BD(n_processo, id_andamento, resultado, session):
 
 
 
-
-
-
-
-
-def captura_ids_processo(n_processo):
-
+# Captura os ids dos documentos e suas informações a partir de um processo (e o id, pois podem haver vários processos com o mesmo numerounico)
+# Preenche essas informações no banco de dados tabela tb_documentos
+def captura_ids_processo(n_processo, id=None):
+    
+    """
     path = importar_autos_alfresco(n_processo)
     #Função para capturar o id_analise portaria dado o número do processo
     engine = create_engine(DATABASE_URL)
@@ -461,6 +494,32 @@ def captura_ids_processo(n_processo):
     query = text('SELECT numerounico, id FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso')
     resultado = session.execute(query, {"numeroprocesso":n_processo}).fetchone()
     id_analiseportaria =  resultado[1]
+    """
+    
+    path = importar_autos_alfresco(n_processo)
+    # Função para capturar o id_analiseportaria dado o número do processo
+    engine = create_engine(DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+
+    metadata = MetaData()
+    session = Session()
+
+    # Se um ID for passado, usa-o diretamente; caso contrário, faz a consulta
+    if id is not None:
+        id_analiseportaria = id
+    else:
+        # Pesquisa o id da análise no banco pelo número do processo
+        query = text('SELECT numerounico, id FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso')
+        resultado = session.execute(query, {"numeroprocesso": n_processo}).fetchone()
+        if resultado:
+            id_analiseportaria = resultado[1]
+        else:
+            # Se não houver resultado, encerra a função com uma indicação de falha
+            session.close()
+            pdf_document.close()
+            if os.path.isfile(path):
+                os.remove(path)
+            return False
 
     # Captura os ids dos andamentos dentro de um processo
     pdf_document = fitz.open(path)

@@ -1,4 +1,4 @@
-#função para monitorar os custos
+# Função para monitorar os custos
 from langchain_community.callbacks import get_openai_callback
 from langchain_openai.chat_models import ChatOpenAI
 
@@ -8,75 +8,39 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts import PromptTemplate
 from langchain_core.documents import Document
 
-#organizar outputs
+# Organizar outputs
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.pydantic_v1 import BaseModel, Field
 
+# Define a estrutura de dados desejada para alimentos
+class Alimento(BaseModel):
+    nome: str = Field(default="N/A", description="Nome do composto alimentar")
+    quantidade: int = Field(default=0, description="Quantidade por mês")
+    duracao: int = Field(default=0, description="Duração em meses")
 
+class Alimentos(BaseModel):
+    alim: list[Alimento] = Field(description="Lista de compostos alimentares com nome, quantidade por mês e duração")
 
-# Define your desired data structure.
-class Alim(BaseModel):
-    alim: list[str] = Field(description="Lista de compostos alimentares presentes na sentença")
+# Função de análise de itens alimentares
+def AnaliseAlimentares(docsearch, model="gpt-3.5-turbo", Verbose=False, Resumo=True):
 
-#Recebe uma retrieval chain de uma sentença e retorna uma lista de medicamentos presentes
-# pares (medicamento, dosagem_em_mg)
-def AnaliseAlimentares(docsearch, model="gpt-3.5-turbo", Verbose=False):
-
-    #Prompts que podem ser utilizados:
-
-    """
-    Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
-
-    Considere como compostos alimentares apenas substâncias ou produtos alimentícios usados exclusivamente para nutrir, complementar a dieta ou fornecer benefícios à saúde, excluindo medicamentos e suplementos farmacêuticos.
-
-    Outros itens não alimentares, como fraldas, seringas, luvas, oxímetro, leitos hospitalares ou termômetros, não são compostos alimentares.
-
-    Sua tarefa é fornecer uma lista contendo apenas os itens que são compostos alimentares na decisão judicial.
-    """
-    """
-    Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
-
-    Sua tarefa é identificar e listar apenas os itens relacionados à alimentação mencionados na decisão judicial. 
-
-    Considere como compostos alimentares apenas substâncias ou produtos alimentícios usados exclusivamente para nutrir, complementar a dieta ou fornecer benefícios à saúde, incluindo dietas especiais como a dieta enteral. Exclua medicamentos e suplementos farmacêuticos.
-
-    Ignore todos os itens não alimentares, como fraldas, seringas, luvas, oxímetros, leitos hospitalares, termômetros, entre outros.
-
-    Forneça uma lista contendo apenas os compostos alimentares identificados na decisão judicial.
-    """
-    if model == "gpt-4" or model == "gpt-4o":
-        llm = ChatOpenAI(model_name=model, temperature=0)
-        #prompt do robô - context vai ser preenchido pela retrieval dos documentos
+    # Definição do modelo e prompt de sistema
+    llm = ChatOpenAI(model_name=model, temperature=0)
+    if Resumo:
         system_prompt = (
-            "Você é um assessor jurídico analisando documentos jurídicos que podem conter petições, decisões ou sentenças de fornecimento de itens de saúde, tais como medicamentos."
-            "Sua tarefa consiste em extrair dos documentos os nomes dos itens relacionados à alimentação, caso possua algum."
-            "Considere como itens alimentares apenas substâncias ou produtos alimentícios usados exclusivamente para nutrir, complementar a dieta ou fornecer benefícios à saúde, incluindo dietas especiais como a dieta enteral. Exclua medicamentos e suplementos farmacêuticos."
-            "Utilize o contexto para responder às perguntas."
-            "Seja conciso nas respostas."
+            "Você é um assessor jurídico analisando o resumo de um documento que contém uma petição ou decisão judicial."
+            "Utilize o resumo para responder às perguntas. Seja conciso nas respostas, entregando apenas as informações solicitadas."
+            "Resumo: {context}"
+        )
+    else:
+        system_prompt = (
+            "Você é um assessor jurídico analisando documentos jurídicos que podem conter petições, decisões ou sentenças de fornecimento de itens de saúde, como itens alimentares."
+            "Sua tarefa consiste em extrair dos documentos os nomes dos itens relacionados à alimentação, quantidade e duração do tratamento, quando estiverem presentes."
+            "Considere como compostos alimentares apenas substâncias ou produtos alimentícios usados exclusivamente para nutrir ou complementar a dieta, como a dieta enteral. Medicamentos não são itens alimentares."
             "Contexto: {context}"
         )
-    elif model == "gpt-3.5-turbo":
-        
-        llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
-        system_prompt = (
-            "Você é um assessor jurídico analisando documentos jurídicos que podem conter petições, decisões ou sentenças de fornecimento de itens de saúde, tais como medicamentos."
-            "Sua tarefa consiste em extrair dos documentos os nomes dos itens relacionados à alimentação, caso possua algum."
-            "Considere como itens alimentares apenas substâncias ou produtos alimentícios usados exclusivamente para nutrir, complementar a dieta ou fornecer benefícios à saúde, incluindo dietas especiais como a dieta enteral. Exclua medicamentos e suplementos farmacêuticos."
-            "Utilize o contexto para responder às perguntas."
-            "Seja conciso nas respostas."
-            "Contexto: {context}"
-        )
-    elif model == "gpt-3.5-turbo-16k":
-        
-        llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
-        system_prompt = (
-        "Você é um assessor jurídico analisando o resumo de um documento que contém uma petição ou decisão judicial."
-        "Utilize o resumo para responder às perguntas. "
-        "Seja conciso nas respostas, entregando apenas as informações solicitadas"
-        "Resumo: {context}"
-        )
 
-    #prompt do chat
+    # Template do prompt do chat
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", system_prompt),
@@ -84,88 +48,68 @@ def AnaliseAlimentares(docsearch, model="gpt-3.5-turbo", Verbose=False):
         ]
     )
 
-    #cria uma chain de perguntas e respostas
+    # Criação da chain de perguntas e respostas
     question_answer_chain = create_stuff_documents_chain(llm, prompt)
 
-    #cria uma chain de retrieval para realizar as perguntas e respostas
+    # Chain de retrieval para perguntas e respostas
     chain = create_retrieval_chain(docsearch.as_retriever(), question_answer_chain)
 
-
-    la = [] #lista de medicamentos
-    cost = 0
-
-    if model == "gpt-4" or model == "gpt-4o":
-        #Aqui o objetivo dos prompts é listar os itens que são medicamentos
+    la = []  # Lista de alimentos
+    if not Resumo:
         q1 = """
-            Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
-
-            Sua tarefa é identificar e listar apenas os itens relacionados à alimentação mencionados na decisão judicial. 
-
-            Considere como itens alimentares apenas substâncias ou produtos alimentícios usados exclusivamente para nutrir, complementar a dieta ou fornecer benefícios à saúde, incluindo dietas especiais como a dieta enteral. Exclua medicamentos e suplementos farmacêuticos.
-
-            Algumas marcas conhecidas destes itens são: FORTINI, TROPHI, NUTREN, NOVASOURCE.
-            
-            Alguns padrões que surgem nos nomes destes itens são: NUTRI, DIET, ENERGY, PROTEIN.
-
-            Ignore todos os itens não alimentares, como fraldas, seringas, luvas, oxímetros, leitos hospitalares, termômetros, entre outros.
-
-            Forneça uma lista contendo apenas os itens alimentares identificados na decisão judicial.
-            
-            Em hipótese alguma forneça na lista compostos que não estavam na decisão. Se não houverem itens alimentares, apenas responda que não há medicamentos.
+            Você é um assessor jurídico analisando um documento judicial.
+            Considere que compostos Nutricionais e/ou Dietas Especiais são Suplementos ou regimes alimentares específicos recomendados para atender às necessidades nutricionais de pacientes com condições de saúde particulares, como alergias, intolerâncias, deficiências nutricionais ou doenças crônicas, visando promover ou restaurar a saúde. Eles não devem ser confundidos com medicamentos.
+            Sua tarefa é fornecer uma lista com os compostos nutricionais mencionados na decisão, como nome, quantidade por mês e duração em meses caso estas informações estejam presentes.
+            Forneça apenas a lista com os itens e suas informações, e indique caso não haja nenhum item desta categoria.
         """
-    elif model == "gpt-3.5-turbo":
+    else:
         q1 = """
-            Você é um assessor jurídico analisando um documento que contém uma decisão judicial.
-
-            Sua tarefa é identificar e listar apenas os itens relacionados à alimentação mencionados na decisão judicial. 
-
-            Considere como itens alimentares apenas substâncias ou produtos alimentícios usados exclusivamente para nutrir, complementar a dieta ou fornecer benefícios à saúde, incluindo dietas especiais como a dieta enteral. Exclua medicamentos e suplementos farmacêuticos.
-
-            Ignore todos os itens não alimentares, como fraldas, seringas, luvas, oxímetros, leitos hospitalares, termômetros, entre outros.
-
-            Forneça uma lista contendo apenas os itens alimentares identificados na decisão judicial.
-            
-            Em hipótese alguma forneça na lista compostos que não estavam na decisão. Se não houverem itens alimentares, apenas responda que não há medicamentos.
+            Você é um assessor jurídico analisando o resumo de um documento judicial.
+            Considere que compostos Nutricionais e/ou Dietas Especiais são Suplementos ou regimes alimentares específicos recomendados para atender às necessidades nutricionais de pacientes com condições de saúde particulares, como alergias, intolerâncias, deficiências nutricionais ou doenças crônicas, visando promover ou restaurar a saúde. Eles não devem ser confundidos com medicamentos.
+            Sua tarefa é fornecer uma lista com os compostos Nutricionais mencionados no resumo, incluindo nomes, quantidade por mês e duração em meses, caso estas informações estejam presentes.
+            Forneça apenas a lista com os itens e suas informações, e indique caso não haja nenhum item desta categoria.
         """
-    
-    elif model == "gpt-3.5-turbo-16k":
-        q1 = """
-            Você é um assessor jurídico analisando o resumo de um documento que contém uma petição ou decisão judicial.
 
-            Considere como itens alimentares apenas substâncias ou produtos alimentícios usados exclusivamente para nutrir, complementar a dieta ou fornecer benefícios à saúde, incluindo dietas especiais como a dieta enteral. Exclua medicamentos e suplementos farmacêuticos.
-
-            Sua tarefa é identificar e listar apenas os itens relacionados à alimentação mencionados no resumo do documento. 
-
-            Forneça uma lista contendo apenas os itens alimentares identificados na decisão judicial.
-            
-            Em hipótese alguma forneça na lista itens alimentares que não estavam na decisão. Se não houverem itens alimentares, apenas responda que não há medicamentos.
-        """
-    
+    # Chamadas de API e monitoramento de custos
     with get_openai_callback() as c1:
-        r1 = chain.invoke({"input": q1}).get('answer')
-        cost += c1.total_cost
+        r1 = chain.invoke({"input": q1}).get("answer")
+
+    cost1 = (c1.prompt_tokens, c1.completion_tokens)
 
     if Verbose:
-        print(f"Itens Alimentares presentes no documento judicial: {r1}")
-    
-    #r1 = chain.invoke({"input": q1}).get('answer')
+        print(f"=> Compostos alimentares presentes no documento: {r1}")
 
-    parser = JsonOutputParser(pydantic_object=Alim)
+    # Definindo o parser
+    parser = JsonOutputParser(pydantic_object=Alimentos)
 
     prompt = PromptTemplate(
-        template="Forneça apenas a lista com os nomes dos itens alimentares.\n{format_instructions}\n{query}\n",
+        template="Forneça apenas a lista com nomes dos compostos alimentares, quantidade por mês e duração em meses.\n{format_instructions}\n{query}\n",
         input_variables=["query"],
         partial_variables={"format_instructions": parser.get_format_instructions()},
     )
 
     chain2 = prompt | llm | parser
-    
+
     with get_openai_callback() as c2:
         la = chain2.invoke({"query": r1}).get("alim")
-        cost += c2.total_cost
+
+    cost2 = (c2.prompt_tokens, c2.completion_tokens)
 
     if Verbose:
-        print(f"Itens Alimentares extraidos do documento judicial: {la}")   
- 
-    return (la, cost)
+        print(f"=> Compostos alimentares extraídos: {la}")
 
+    # Formatação estruturada dos resultados
+    r = []
+    for alimento in la:
+        alimento.setdefault("nome", "")
+        alimento.setdefault("quantidade", 0)
+        alimento.setdefault("duracao", 0)
+        r.append((alimento["nome"], alimento["quantidade"], alimento["duracao"]))
+
+    if Verbose:
+        print(f"=> Compostos alimentares no formato estruturado: {r}")
+
+    # Cálculo total de custos
+    cost = (cost1[0] + cost2[0], cost1[1] + cost2[1])
+
+    return r, cost
