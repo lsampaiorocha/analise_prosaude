@@ -12,6 +12,16 @@ import PyPDF2
 import re
 import os
 
+# Imports despacho João Claudio
+import openai
+import csv
+import json
+import pandas as pd
+import requests
+from urllib.parse import urlencode
+from templates import TEMPLATE_MEDICAMENTO
+from article import DocumentProcessor
+
 from datetime import datetime
 
 
@@ -38,10 +48,11 @@ def importar_autos_alfresco(n_processo):
       metadata_alfresco = MetaData()
       
       session_alfresco = Session_alfresco()
-      query = text('SELECT numerounico, idalfresco FROM scm_robo_intimacao.tb_autosprocessos WHERE numerounico = :numero_processo')
+      query = text('SELECT numerounico, idalfresco,id FROM scm_robo_intimacao.tb_autosprocessos WHERE numerounico = :numero_processo')
       resultado_alfresco = session_alfresco.execute(query, {"numero_processo": n_processo}).fetchone()
 
       id_alfresco =  resultado_alfresco[1]
+      id_processo = resultado_alfresco[2]
       
       session_alfresco.commit()
 
@@ -59,7 +70,7 @@ def importar_autos_alfresco(n_processo):
                   file_extension = 'docx'
               else:
                   return False
-              path = f"arquivos/{id_alfresco}.{file_extension}"
+              path = f"arquivos/{id_processo}.{file_extension}"
               with open(path, 'wb') as file:  # Assumindo que o arquivo é um PDF
                   file.write(response.content)
           
@@ -339,6 +350,7 @@ def analisar_processo(numero_processo):
   
   if isinstance(resposta, dict):
     grava_resultado_BD(n_processo, id_andamento, resposta, session)
+    gerar_despacho(n_processo,session)
   else:
     return resposta
   
@@ -386,8 +398,8 @@ def analisa(n_processo, id_andamento):
 
       resposta = AnalisePortaria(file_path, models, pdf_filename, Verbose=True) 
       
-      if os.path.isfile(path):
-          os.remove(path) 
+      #if os.path.isfile(path):
+      #    os.remove(path) 
       
       return resposta
 
@@ -556,6 +568,228 @@ def captura_ids_processo(n_processo, id=None):
     if os.path.isfile(path):
         os.remove(path) 
     return True
+
+
+
+def encontrar_arquivo(nome_arquivo):
+    
+    nome_arquivo_comp = f"{nome_arquivo}.pdf"
+    diretorio_arquivos = f'arquivos/'  
+    for raiz, _, arquivos in os.walk(diretorio_arquivos):
+        if nome_arquivo_comp in arquivos:
+            caminho_completo = os.path.join(raiz, nome_arquivo_comp)
+            return caminho_completo
+    return False
+
+#  ler o texto do PDF
+def read_pdf(file_path):
+    from PyPDF2 import PdfReader
+
+    with open(file_path, 'rb') as file:
+        reader = PdfReader(file)
+        text = ''
+        for page_num in range(len(reader.pages)):
+            page = reader.pages[page_num]
+            text += page.extract_text()
+    return text
+
+# dividir o texto em partes menores
+def split_text(text, max_length):
+    words = text.split()
+    current_length = 0
+    current_chunk = []
+    chunks = []
+
+    for word in words:
+        current_length += len(word) + 1  # +1 para o espaço
+        if current_length > max_length:
+            chunks.append(' '.join(current_chunk))
+            current_chunk = [word]
+            current_length = len(word) + 1
+        else:
+            current_chunk.append(word)
+
+    if current_chunk:
+        chunks.append(' '.join(current_chunk))
+
+    return chunks
+
+
+def get_specific_info(text, api_key):
+
+    openai.api_key = api_key
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um jurista especializado em decisões judiciais."},
+                {"role": "user", "content": f"Extraia as seguintes informações do texto judicial:\n\n\
+                1. Identificação do Despacho: Indicação de que se trata de uma sentença judicial.\n\
+                2. Decisão sobre o Pleito: Indicação de que o pleito autoral foi julgado procedente e a decisão antecipatória de tutela foi ratificada.\n\
+                3. Especificação do Medicamento: Nome do medicamento e detalhes, como a dosagem. Confirmação de que o medicamento está registrado na ANVISA.\n\
+                4. Danos Morais: Afirmativa sobre a ausência de danos morais.\n\
+                5. Direcionamentos Finais: Instruções sobre não interpor recurso se cabível. Orientações para comunicar a Secretaria de Estado da Saúde (SESA) ou outras entidades sobre a decisão. Direções sobre arquivamento do processo conforme orientação da chefia.\n\
+                \nTexto: {text}"}
+            ]
+        )
+        extracted_info = response.choices[0].message.content.strip()
+        return extracted_info
+    except Exception as e:
+        print(f"Error during API call: {e}")
+        return ""
+
+
+# processar todos os PDFs de uma pasta no Google Drive
+def process_pdfs_from_drive(file_path, api_key):
+    extracted_data = []
+
+    #for filename in os.listdir(folder_path):
+        #if filename.endswith(".pdf"):
+    #file_path = os.path.join(folder_path, filename)
+    pdf_text = read_pdf(file_path)
+    chunks = split_text(pdf_text, 10000)
+
+    full_text = ""
+    for chunk in chunks:
+        full_text += chunk
+
+    # Extrair informações do texto completo
+    extracted_info = get_specific_info(full_text, api_key)
+    filename = os.path.basename(file_path)
+    extracted_data.append((filename, extracted_info))
+
+    return extracted_data
+
+def grava_despacho_bd(fk,despacho,session):
+    insercaoAM = session.execute(text("""
+            UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
+            SET despacho_gerado=:despacho
+                                            
+            WHERE fk_autosprosaude=:fk;
+        """), {
+            'despacho': despacho,
+            'fk': fk
+            
+        })
+    session.commit()
+
+def gerar_despacho(n_processo,session):
+
+    ### Parte responsável pela  busca no banco de dados:
+    # Pesquisa o
+    query = text('SELECT fk_autosprosaude,possui_outros,possui_medicamentos,possui_condenacao_honorarios,aplica_portaria,numerounico FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.analisado is true AND ta.numerounico =:numeroprocesso')
+    resultado = session.execute(query, {"numeroprocesso":n_processo}).fetchone()
+
+    nome_arquivo =  resultado[0]
+
+
+    json_file_path = 'dl_extracted_data.json'
+
+    # Estrutura de dados a ser salva
+    dados_json = {
+        "nome_arquivo": f"{nome_arquivo}.pdf",
+        "possui_outros": resultado[1],
+        "possui_medicamento": resultado[2],
+        "possui_condenacao_honorario": resultado[3]
+    }
+
+    # Escrever as informações extraídas em um arquivo JSON
+    with open(json_file_path, mode='w', encoding='utf-8') as file:
+        json.dump(dados_json, file, ensure_ascii=False, indent=4)
+
+    print("DataFrame convertido e salvo em formato JSON com sucesso.")
+
+    ### Parte responsável pela análise do arquivo pdf 
+
+    caminho_arquivo =  encontrar_arquivo(nome_arquivo)
+    if caminho_arquivo is False:
+        return False
+    api_key = "sk-proj-P2P5NFRtGPSiQpe4HY0LT3BlbkFJq4CE1TqvPigoZHOWoxMy"
+
+    pdf_extracted_data = process_pdfs_from_drive(caminho_arquivo, api_key)
+
+    # Caminho do arquivo JSON
+    json_file_path = 'pdf_extracted_data.json'
+
+    # Estrutura de dados a ser salva
+    data_to_save = [{"File Name": data[0], "Extracted Information": data[1]} for data in pdf_extracted_data]
+
+    # Escrever as informações extraídas em um arquivo JSON
+    with open(json_file_path, mode='w', encoding='utf-8') as file:
+        json.dump(data_to_save, file, ensure_ascii=False, indent=4)
+
+    print("Informações extraídas salvas no arquivo JSON com sucesso.")
+
+    ## Mesclando os json em um só:
+
+    # Carregar os arquivos JSON
+    with open('dl_extracted_data.json', 'r', encoding='utf-8') as file1:
+        output_dl = json.load(file1)
+
+    with open('pdf_extracted_data.json', 'r', encoding='utf-8') as file2:
+        pdf_extracted_data = json.load(file2)
+
+    # Criar um dicionário de busca para pdf_extracted_data baseado no "File Name"
+    pdf_data_dict = {item['File Name']: item for item in pdf_extracted_data}
+    # Mesclar os arquivos com base no nome do arquivo
+    merged_data = []
+    file_name = output_dl.get("nome_arquivo")
+    if file_name in pdf_data_dict:
+        merged_entry = {**output_dl, **pdf_data_dict[file_name]}
+        merged_data.append(merged_entry)
+
+    # Salvar o arquivo mesclado
+    with open('merged_output.json', 'w', encoding='utf-8') as output_file:
+        json.dump(merged_data, output_file, ensure_ascii=False, indent=4)
+
+    print("Os arquivos foram mesclados com sucesso.")
+  
+    with open('merged_output.json', 'r', encoding='utf-8') as file3:
+        dadosextraidos = json.load(file3)
+
+    # Parte responsável por gerar o despacho
+    base_url = 'http://127.0.0.1:5000' # Adjust this to match your server's address and port
+
+    #Parâmetros que o usuário deve passar
+    params = {
+        "knowledge_area": "SENTENCA JUDICIAL",
+        'area': "SENTENCA JUDICIAL - DESPACHO MEDICO",
+        'subject': (
+            "SENTENCA JUDICIAL - DESPACHO MEDICO",
+        ),
+        'topic': (
+            "SENTENCA JUDICIAL - DESPACHO MEDICO"
+        ),
+        'context': dadosextraidos,
+    }
+    # Encode the query parameters
+    encoded_params = urlencode(params)
+
+    # Construct the full URL with the query parameters
+    url = f'{base_url}/projeto-template?{encoded_params}'
+    print(url)
+
+    data = {
+    "template": TEMPLATE_MEDICAMENTO
+    }
+    with requests.Session() as client:
+        # Make the GET request
+        response = client.post(
+            url,
+            json=data,
+            headers={"Content-Type": "application/json"}
+        )
+
+        # Check if the request was successful
+        if response.ok and response.status_code == 200:
+            # Parse the JSON response
+            data = response.json()
+            print(response)
+        else:
+            print(f"Request failed with status code {response.status_code}")
+
+    despacho  = data['result']['sections'][0]['content'][0]['paragraph']
+    grava_despacho_bd(nome_arquivo,despacho,session)
 
 
 
@@ -729,3 +963,22 @@ def grava_resultado_BD(n_processo, id_andamento, resultado, session):
     session.commit()
 
 """
+if __name__ =="__main__":
+    engine = create_engine(DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+    
+    # Metadados globais
+    metadata = MetaData()
+    # Registrar a tabela tb_autosprosaude no metadata
+    tb_autosprosaude = Table(
+        'tb_autosprosaude', metadata,
+        Column('id', Integer, primary_key=True),
+        schema='scm_robo_intimacao'
+    )
+        
+    
+    #Marcador para ignorar linha
+    marca = 0
+
+    session = Session()
+    gerar_despacho("3008970-53.2024.8.06.0001",session)

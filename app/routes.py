@@ -5,6 +5,11 @@ from AnalisePortaria import *
 #Lógica de execução das rotas
 from .logica import *
 
+#JC
+from urllib.parse import unquote
+from apps import config_build
+from projai.apps import app_project_inovafit
+
 
 def configure_routes(app):
   
@@ -73,3 +78,23 @@ def configure_routes(app):
     if retorno is True:
       return jsonify({"message": "Processo atualizado com sucesso."}), 200
       
+
+  @app.route('/projeto-template', methods=['POST'])
+  def get_projeto_template():
+    data = request.get_json()
+    template = data['template']
+    knowledge_area = unquote(request.args.get('knowledge_area', ''))
+    area = unquote(request.args.get('area', ''))
+    subject = unquote(request.args.get('subject', ''))
+    topic = unquote(request.args.get('topic', ''))
+    context = unquote(request.args.get('context', None))
+    config = config_build(
+        knowledge_area=knowledge_area,
+        area=area,
+        subject=subject,
+        topic=topic,
+        context=context,
+        template=template,
+    )
+    result = app_project_inovafit(**config)
+    return jsonify({'result': result})
