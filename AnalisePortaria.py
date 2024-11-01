@@ -23,6 +23,8 @@ import tempfile
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
+
+
 class TipoDocumentoIndeterminadoException(Exception):
     pass
 
@@ -158,7 +160,9 @@ def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True,
         embeddings = OpenAIEmbeddings()
         #docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 128})
         docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024}) #essa opção "hnsw:M": 1024 é importante para não ter problemas
-            
+        
+        print("Passou do Chroma")
+        
         #aplica o pipeline de análise apropriado ao tipo de documento
         resposta = AnalisePipeline(filtered_pages, docsearch, models, Verbose, MedRobot, TipoDocumento=tipo_documento, Resumo=Resumo, CustoResumo=custoresumo)
 
@@ -171,6 +175,7 @@ def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True,
         docsearch = None 
         ids = [] 
 
+        """
         with open(__file__, 'r+') as f:
             # Lê o conteúdo do arquivo
             content = f.read()
@@ -182,7 +187,7 @@ def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True,
             f.seek(0)
             f.write(content)
             f.truncate()
-
+        """
 
         return resposta
     
@@ -321,8 +326,8 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
         
         
         #resultado da aplicação da portaria em seus 6 incisos
-        resposta['aplicacao_incisos'] = [(resposta['lista_medicamentos'] or resposta['internacao']) and resposta['respeita_valor_teto'] and not resposta['condenacao_honorarios'] and not resposta['possui_outros_proibidos'],
-            False,
+        resposta['aplicacao_incisos'] = [False,
+            (resposta['internacao'] or resposta['possui_consulta']) and resposta['respeita_valor_teto'] and not resposta['condenacao_honorarios'] and not resposta['possui_outros_proibidos'],
             False,
             False,
             False,
@@ -453,8 +458,8 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
         
         
         #resultado da aplicação da portaria em seus 6 incisos
-        resposta['aplicacao_incisos'] = [(resposta['lista_medicamentos'] or resposta['internacao']) and resposta['respeita_valor_teto'] and not resposta['condenacao_honorarios'] and not resposta['possui_outros_proibidos'],
-            False,
+        resposta['aplicacao_incisos'] = [False,
+            (resposta['internacao'] or resposta['possui_consulta']) and not resposta['possui_outros_proibidos'],
             False,
             False,
             False,

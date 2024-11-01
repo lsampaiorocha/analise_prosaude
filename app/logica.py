@@ -13,6 +13,7 @@ import re
 import os
 
 # Imports despacho João Claudio
+
 import openai
 import csv
 import json
@@ -21,6 +22,7 @@ import requests
 from urllib.parse import urlencode
 from templates import TEMPLATE_MEDICAMENTO
 from article import DocumentProcessor
+
 
 from datetime import datetime
 
@@ -82,6 +84,9 @@ def importar_autos_alfresco(n_processo):
 #Função que irá separar o documento a ser analisado pela portaria do restante dos autos 
 def separar_pelo_id(path,id_andamento): 
     pdf_document = fitz.open(path)
+    
+    primeira_pagina = identificar_primeira_pagina(pdf_document, id_andamento)
+    
     pages_to_extract = []
     for page_num in range(len(pdf_document)):
         page = pdf_document.load_page(page_num)
@@ -111,19 +116,12 @@ def separar_pelo_id(path,id_andamento):
     new_pdf.save(file_path)
     new_pdf.close()
     pdf_document.close()
-    return file_path,filename
+    return file_path,filename, primeira_pagina
 
 
 # Função que irá identificar a primeira página do documento a ser analisado pela portaria
-def identificar_primeira_pagina(n_processo,id_andamento):
-    
-    path = importar_autos_alfresco(n_processo)
-    
-    if not path:
-        return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
-    
-    pdf_document = fitz.open(path)
-    
+def identificar_primeira_pagina(pdf_document, id_andamento):
+        
     # Variável para armazenar o número da primeira página encontrada
     primeira_pagina = None
 
@@ -136,7 +134,7 @@ def identificar_primeira_pagina(n_processo,id_andamento):
             primeira_pagina = page_num
             break  # Interrompe o loop após encontrar a primeira ocorrência
 
-    pdf_document.close()
+    #pdf_document.close()
     
     # Retorna o número da primeira página encontrada, ou None se não encontrado
     return primeira_pagina
@@ -213,7 +211,7 @@ def importar_processos():
       checagem1 = session.execute(text(f'SELECT * FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.fk_autosprosaude = {row[0]}'))
       for check in checagem1:
           if(check[1] == row[0]):
-              print('Elemento já inserido')
+              print(f'Ignorado: Processo de no. unico {row[1]} e id {row[0]} já foi inserido')
               marca = 1
               break    
       if(marca == 1):
@@ -228,6 +226,7 @@ def importar_processos():
       else:
           temppk = buscaultimoid[0] + 1 
 
+      print(f'Inserindo: Processo de no. unico {row[1]} e id {row[0]}')
     
       #fk_autosprosaude
       tempfk = row[0]
@@ -247,6 +246,13 @@ def importar_processos():
       resultado1 =(temppk,tempfk,tempNU,tempCA,tempbase,tempdtproc)
   
       insercao = session.execute(text('INSERT into scm_robo_intimacao.tb_analiseportaria (id, fk_autosprosaude, numerounico, caminho, base, dt_processado) values(:id,:fk_autosprosaude,:numerounico,:caminho,:base,:dt_processado)'),{'id':f'{temppk}','fk_autosprosaude':f'{tempfk}','numerounico':f'{tempNU}','caminho':f'{tempCA}','base':f'{tempbase}','dt_processado':f'{tempdtproc}'})
+      
+      session.commit()
+      
+      print(f'Capturando documentos: Processo de no. unico {row[1]} e id {row[0]}')
+      captura_ids_processo(row[1], id=None)
+      
+      print(f'Inserido: Processo de no. unico {row[1]} e id {row[0]}')
       
       ############    
 
@@ -370,7 +376,7 @@ def analisa(n_processo, id_andamento):
         return jsonify({"error":"Processo não encontrado no Alfresco!"}), 400  
       
       # Função para separar a peça dado o id do documento
-      file_path,filename = separar_pelo_id(path,id_andamento)
+      file_path,filename, primeira_pagina = separar_pelo_id(path,id_andamento)
       
       if file_path is None:
         return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
@@ -382,6 +388,7 @@ def analisa(n_processo, id_andamento):
 
       if len(pdf_content) == 0:
         return jsonify({"error": "O arquivo enviado está vazio!"}), 400
+        
 
       pdf_filename = filename
       file_path = os.path.join('temp', pdf_filename)      
@@ -397,6 +404,13 @@ def analisa(n_processo, id_andamento):
       }
 
       resposta = AnalisePortaria(file_path, models, pdf_filename, Verbose=True) 
+      
+      if not isinstance(resposta, dict):
+        return jsonify({"error":"O retorno de AnalisePortaria não é um dicionário"}), 400
+
+      
+      #
+      resposta['primeira_pagina'] = primeira_pagina + 1
       
       #if os.path.isfile(path):
       #    os.remove(path) 
@@ -430,7 +444,8 @@ def grava_resultado_BD(n_processo, id_andamento, resultado, session):
         resumo =:resumo, 
         resumo_analise =:resumo_analise,
         marcado_analisar =:marcado_analisar, 
-        dt_analisado =:dt_analisado, 
+        dt_analisado =:dt_analisado,
+        pagina_analisada =:pagina_analisada, 
         id_documento_analisado =:id_analisado 
         WHERE ta.numerounico=:numero_processo
     """)
@@ -459,6 +474,7 @@ def grava_resultado_BD(n_processo, id_andamento, resultado, session):
         'resumo_analise': resultado['resumo_analise'],
         'marcado_analisar': True,
         'dt_analisado': datetime.now(),
+        'pagina_analisada': resultado['primeira_pagina'] if 'primeira_pagina' in resultado else None,
         'id_analisado': id_andamento
     })
 
@@ -615,6 +631,7 @@ def split_text(text, max_length):
     return chunks
 
 
+
 def get_specific_info(text, api_key):
 
     openai.api_key = api_key
@@ -661,12 +678,12 @@ def process_pdfs_from_drive(file_path, api_key):
     return extracted_data
 
 def grava_despacho_bd(fk,despacho,session):
-    insercaoAM = session.execute(text("""
+    insercaoAM = session.execute(text('''
             UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
             SET despacho_gerado=:despacho
                                             
             WHERE fk_autosprosaude=:fk;
-        """), {
+        '''), {
             'despacho': despacho,
             'fk': fk
             
@@ -792,8 +809,8 @@ def gerar_despacho(n_processo,session):
     grava_despacho_bd(nome_arquivo,despacho,session)
 
 
-
 """
+
 def grava_resultado_BD(n_processo, id_andamento, resultado, session):
 
     #RESUMO
@@ -962,7 +979,7 @@ def grava_resultado_BD(n_processo, id_andamento, resultado, session):
         insercaoAM = session.execute(text('INSERT into db_pge.scm_robo_intimacao.tb_medicamentos (id, id_analiseportaria, nome_principio, nome_comercial, dosagem, possui_anvisa, registro_anvisa, fornecido_SUS, valor) values(:id, :id_analiseportaria, :nome_principio, :nome_comercial, :dosagem, :possui_anvisa, :registro_anvisa, :fornecido_SUS, :valor)'),{'id':f'{idmedicamento}','id_analiseportaria':f'{idportaria}','nome_principio':f'{nome_principio}','nome_comercial':f'{nome_comercial}','dosagem':f'{dosagem}','possui_anvisa':f'{possuianvisa}','registro_anvisa':f'{registroanvisa}','fornecido_SUS':f'{ofertaSUS}','valor':f'{precoPMVG}'})
     session.commit()
 
-"""
+
 if __name__ =="__main__":
     engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
@@ -982,3 +999,6 @@ if __name__ =="__main__":
 
     session = Session()
     gerar_despacho("3008970-53.2024.8.06.0001",session)
+    
+    
+"""
