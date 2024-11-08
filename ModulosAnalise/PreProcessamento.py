@@ -46,78 +46,6 @@ def preprocessamento(caminho, models, Verbose=False, TipoDocumento="Indeterminad
         
         (resumo, custo) = GeraResumo(pages, models['resumo'], api_key, Verbose=Verbose)
         
-        '''
-        resumo = """
-        **Resumo do Documento Jurídico**
-
-        - **Tipo de Documento:** Sentença
-        - **Valor da Causa:** Não especificado no documento.
-        - **Itens a serem fornecidos:**
-        - Fralda geriátrica tamanho XG – 180 unidades/mês
-        - Novasource GC ou Nutri Enteral Soya ou Isosource Soya – 38 unidades/mês
-        - Seringa 20ml sem agulha – 31 unidades/mês
-        - Equipo – 31 unidades/mês
-        - Frasco (Enterofix) 300ml – 31 unidades/mês
-        - Cloridrato de Memantina 10mg – 30 unidades/mês
-        - Zolpidem 10mg – 30 unidades/mês
-        - Hemitartarato de Haloperidol 5mg – 60 unidades/mês
-        - **Medicamentos:**
-        - Cloridrato de Memantina 10mg – 30 unidades/mês, uso contínuo e por tempo indeterminado
-        - Zolpidem 10mg – 30 unidades/mês, uso contínuo e por tempo indeterminado
-        - Hemitartarato de Haloperidol 5mg – 60 unidades/mês, uso contínuo e por tempo indeterminado
-        - **Internação ou Transferência para UTI/UCE:** Não há solicitação ou obrigação de internação ou transferência para UTI ou UCE.
-        - **Danos Morais:** Não há solicitação ou condenação por danos morais.
-        - **Honorários:**
-        - Condenação do Estado do Ceará ao pagamento de honorários advocatícios à ordem de 10% sobre o valor atualizado da causa.
-        - **Multa ou Bloqueio de Recursos:** Não há condenação por multa ou bloqueio de recursos.
-
-        **Observações Adicionais:**
-        - A sentença ratifica a decisão interlocutória anterior e julga procedente o pedido autoral.
-        - A sentença está sujeita ao duplo grau de jurisdição obrigatório.
-        - A Defensoria Pública deve receber honorários sucumbenciais, destinados exclusivamente ao aparelhamento das Defensorias Públicas.
-        
-        
-        """
-        '''
-        
-        
-        
-        '''
-        #EXEMPLO DE RESUMO (para testes)
-        custo = 0
-        resumo = """
-        **Resumo do Documento**
-
-        **Resumo do Documento**: Decisão Interlocutória
-
-        **Itens a serem fornecidos:**
-        - Medicamento: Denosumabe
-        - Dosagem: Não especificada
-        - Quantidade: Uma dose a cada seis meses
-        - Duração do tratamento: Enquanto necessário, conforme indicação médica
-
-        **Internação ou Transferência:**
-        - Não há solicitação ou obrigação de internação ou transferência para Unidade de Terapia Intensiva (UTI) ou Unidade de Cuidados Especiais (UCE).
-
-        **Indenização por Danos Morais:**
-        - Não há solicitação de indenização por danos morais.
-
-        **Condenação por Danos Morais:**
-        - Não há condenação por danos morais.
-
-        **Condenação por Honorários:**
-        - Não há condenação por honorários.
-
-        **Condenação por Multa ou Bloqueio de Recursos:**
-        - Há determinação de bloqueio de verba pública para efetivo cumprimento da ordem judicial, caso o Estado do Ceará não forneça o medicamento Denosumabe no prazo de 10 dias.
-
-        **Detalhes Adicionais:**
-        - A ação foi ajuizada por Maria da Silva Ferreira contra o Estado do Ceará, solicitando o fornecimento do medicamento Denosumabe devido ao diagnóstico de osteoporose grave.
-        - A decisão defere o pedido de antecipação de tutela, determinando o fornecimento do medicamento a cada seis meses, com renovação dos laudos médicos a cada três meses.
-        - O processo tramita na 11ª Vara da Fazenda Pública da Comarca de Fortaleza, sob o número 3006163-31.2022.8.06.0001, com valor da causa de R$ 2.240,00.     
-        - A ação é pública e a requerente tem direito à justiça gratuita.
-        """
-        '''
         
         filtered_pages = []
         filtered_pages.append(Document(page_content=resumo, metadata={"page": 0, "source": caminho}))
@@ -250,31 +178,7 @@ def ExtraiTipoDocumento(resumo):
         
     return tipo_identificado
 
-    
 
-"""
-def ExtraiTipoDocumento(resumo):
-    # Definindo os tipos de documentos possíveis
-    tipos_possiveis = ["Petição Inicial", "Decisão Interlocutória", "Sentença"]
-    
-    # Lista para armazenar os tipos de documentos encontrados
-    encontrados = []
-
-    # Verificando cada tipo de documento no texto
-    for t in tipos_possiveis:
-        if re.search(t, resumo, re.IGNORECASE):
-            encontrados.append(t)
-    
-    print(f'Aqui os encontrados {encontrados}')
-
-    # Se mais de um tipo de documento for encontrado, retornar "Não determinado"
-    if len(encontrados) > 1 or len(encontrados) == 0:
-        tipo_identificado = "Indeterminado"
-    elif len(encontrados) == 1:
-        tipo_identificado = encontrados[0]
-        
-    return tipo_identificado
-"""
 
 #Verifica se o PDF é searchable tentando extrair texto de suas páginas.
 def Searchable(caminho):

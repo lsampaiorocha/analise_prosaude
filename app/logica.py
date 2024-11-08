@@ -13,7 +13,7 @@ import re
 import os
 
 # Imports despacho João Claudio
-
+"""
 import openai
 import csv
 import json
@@ -22,7 +22,7 @@ import requests
 from urllib.parse import urlencode
 from templates import TEMPLATE_MEDICAMENTO
 from article import DocumentProcessor
-
+"""
 
 from datetime import datetime
 
@@ -87,7 +87,12 @@ def separar_pelo_id(path,id_andamento):
     
     primeira_pagina = identificar_primeira_pagina(pdf_document, id_andamento)
     
-    pages_to_extract = []
+    if not primeira_pagina:
+        return None, None, None
+    
+    #pages_to_extract = []
+    pages_to_extract = [0]  # Sempre inclui a primeira página, que contem valor da causa, partes, etc..
+    
     for page_num in range(len(pdf_document)):
         page = pdf_document.load_page(page_num)
         text1 = page.get_text()
@@ -106,7 +111,7 @@ def separar_pelo_id(path,id_andamento):
         text_length += len(text2)
         
     if not pages_to_extract:
-        return None, None
+        return None, None, None
 
     output_path = "temp"  
     filename = "portaria_temp.pdf"           
@@ -133,7 +138,7 @@ def identificar_primeira_pagina(pdf_document, id_andamento):
         if f"Num. {id_andamento} - Pág." in text:
             primeira_pagina = page_num
             break  # Interrompe o loop após encontrar a primeira ocorrência
-
+        
     #pdf_document.close()
     
     # Retorna o número da primeira página encontrada, ou None se não encontrado
@@ -176,7 +181,7 @@ def primeira_pagina(n_processo,id_andamento):
 """
 
 
-def importar_processos():
+def importar_processos(SelecaoAutomaticaDocumento=False):
   
   """
   Lógica da Rota para importar os processos de intimações cujos autos já tenham sido baixados pelos
@@ -250,7 +255,7 @@ def importar_processos():
       session.commit()
       
       print(f'Capturando documentos: Processo de no. unico {row[1]} e id {row[0]}')
-      captura_ids_processo(row[1], id=None)
+      captura_ids_processo(row[1], id=None, SelecaoAutomaticaDocumento=SelecaoAutomaticaDocumento)
       
       print(f'Inserido: Processo de no. unico {row[1]} e id {row[0]}')
       
@@ -302,7 +307,8 @@ def analisar_marcados():
       if isinstance(resposta, dict):
           grava_resultado_BD(n_processo, id_andamento, resposta, session)
       else:
-          return jsonify(resposta), 400
+          #return jsonify(resposta), 400
+          print(resposta)
   
   # Retorna a resposta com o resultado do processamento
   return jsonify({"message": "Processos analisados com sucesso."}), 200
@@ -356,7 +362,7 @@ def analisar_processo(numero_processo):
   
   if isinstance(resposta, dict):
     grava_resultado_BD(n_processo, id_andamento, resposta, session)
-    gerar_despacho(n_processo,session)
+    #gerar_despacho(n_processo,session)
   else:
     return resposta
   
@@ -403,7 +409,13 @@ def analisa(n_processo, id_andamento):
       "geral" : "gpt-4o"
       }
 
-      resposta = AnalisePortaria(file_path, models, pdf_filename, Verbose=True) 
+      try:
+        
+        resposta = AnalisePortaria(file_path, models, pdf_filename, Verbose=True) 
+      
+      except Exception as e:
+        return jsonify({"error":f"Não foi possível analisar o processo{n_processo}"}), 400
+      
       
       if not isinstance(resposta, dict):
         return jsonify({"error":"O retorno de AnalisePortaria não é um dicionário"}), 400
@@ -502,13 +514,40 @@ def grava_resultado_BD(n_processo, id_andamento, resultado, session):
             'fornecido_SUS': medicamento['oferta_SUS'] or False,
             'valor': medicamento['preco_PMVG'].replace('R$', '')
         })
+        
+    
+    # INSERÇÃO NA TABELA DE COMPOSTOS ALIMENTARES
+    for alimento in resultado['lista_compostos']:
+        textosql1 = text("SELECT * from db_pge.scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numero_processo")
+        buscaidportaria = session.execute(textosql1, {'numero_processo': n_processo}).fetchone()
+        idportaria = buscaidportaria[0]
+
+        buscaultimoid = session.execute(text("SELECT MAX(tc.id) from db_pge.scm_robo_intimacao.tb_compostos tc")).fetchone()
+        idcomposto = (buscaultimoid[0] or 0) + 1  # Incrementa o ID, começando de 1 se vazio
+
+        insercaoAC = session.execute(text("""
+            INSERT into db_pge.scm_robo_intimacao.tb_compostos
+            (id, id_analiseportaria, nome_composto, qtde, duracao, possui_anvisa, registro_anvisa, valor)
+            values(:id, :id_analiseportaria, :nome_composto, :qtde, :duracao, :possui_anvisa, :registro_anvisa, :valor)
+        """), {
+            'id': idcomposto,
+            'id_analiseportaria': idportaria,
+            'nome_composto': alimento['nome'],
+            'qtde': alimento['quantidade'],
+            'duracao': alimento['duracao'],
+            'possui_anvisa': alimento.get('possui_anvisa', None),
+            'registro_anvisa': alimento.get('registro_anvisa', None),
+            'valor': alimento.get('valor', None)
+        })
+    
+    
     session.commit()
 
 
 
 # Captura os ids dos documentos e suas informações a partir de um processo (e o id, pois podem haver vários processos com o mesmo numerounico)
 # Preenche essas informações no banco de dados tabela tb_documentos
-def captura_ids_processo(n_processo, id=None):
+def captura_ids_processo(n_processo, id=None, SelecaoAutomaticaDocumento=False):
     
     """
     path = importar_autos_alfresco(n_processo)
@@ -586,6 +625,7 @@ def captura_ids_processo(n_processo, id=None):
     return True
 
 
+"""
 
 def encontrar_arquivo(nome_arquivo):
     
@@ -809,7 +849,7 @@ def gerar_despacho(n_processo,session):
     grava_despacho_bd(nome_arquivo,despacho,session)
 
 
-"""
+
 
 def grava_resultado_BD(n_processo, id_andamento, resultado, session):
 

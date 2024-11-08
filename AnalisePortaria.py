@@ -161,7 +161,7 @@ def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True,
         #docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 128})
         docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024}) #essa opção "hnsw:M": 1024 é importante para não ter problemas
         
-        print("Passou do Chroma")
+        #print("Passou do Chroma")
         
         #aplica o pipeline de análise apropriado ao tipo de documento
         resposta = AnalisePipeline(filtered_pages, docsearch, models, Verbose, MedRobot, TipoDocumento=tipo_documento, Resumo=Resumo, CustoResumo=custoresumo)
@@ -257,6 +257,9 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
             if outrosregex:
                 outros = True   
         
+        #lista contendo os nomes de compostos alimentares obtidos da sentença
+        (lalim, calim) = AnaliseAlimentares(docsearch, model=models['alimentares'], Verbose=Verbose, Resumo=Resumo)
+        
         
         #lista contendo os nomes de medicamentos obtidos da sentença
         (lm, cmeds) = AnaliseMedicamentos(docsearch, model=models['medicamentos'], Verbose=Verbose, Resumo=Resumo)
@@ -323,20 +326,29 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
             "preco_PMVG": "R$ {:.2f}".format(preco),
             "preco_PMVG_max": None
             })
+            
+        
+        #adiciona as informações de alimentos obtidas
+        for (nome, qtd, duracao) in lalim:
+            resposta['lista_compostos'].append({
+            "nome": nome,
+            "quantidade": qtd,
+            "duracao": duracao
+            })          
         
         
         #resultado da aplicação da portaria em seus 6 incisos
         resposta['aplicacao_incisos'] = [False,
             (resposta['internacao'] or resposta['possui_consulta']) and resposta['respeita_valor_teto'] and not resposta['condenacao_honorarios'] and not resposta['possui_outros_proibidos'],
-            False,
+            resposta['lista_compostos'] and resposta['respeita_valor_teto'] and not resposta['condenacao_honorarios'] and not resposta['possui_outros_proibidos'],
             False,
             False,
             False]
 
 
         #custo total com LLMs
-        soma_prompt = sum([cdoutros[0], cmeds[0], chonor[0], CustoResumo[0], cinterna[0], cconsultas[0]])
-        soma_completion = sum([cdoutros[1], cmeds[1], chonor[1], CustoResumo[1], cinterna[1], cconsultas[1]])
+        soma_prompt = sum([cdoutros[0], cmeds[0], calim[0], chonor[0], CustoResumo[0], cinterna[0], cconsultas[0]])
+        soma_completion = sum([cdoutros[1], cmeds[1], calim[1],  chonor[1], CustoResumo[1], cinterna[1], cconsultas[1]])
         resposta['custollm'] = CustoGpt4o(soma_prompt, soma_completion)
         resposta['tokensllm'] = (soma_prompt, soma_completion)
         
@@ -389,7 +401,11 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
                 outros = True   
         
         
-        #lista contendo os nomes de medicamentos obtidos da sentença
+        #lista contendo os nomes de compostos alimentares obtidos da petição inicial ou decisão
+        (lalim, calim) = AnaliseAlimentares(docsearch, model=models['alimentares'], Verbose=Verbose, Resumo=Resumo)
+
+        
+        #lista contendo os nomes de medicamentos obtidos da petição inicial ou decisão
         (lm, cmeds) = AnaliseMedicamentos(docsearch, model=models['medicamentos'], Verbose=Verbose, Resumo=Resumo)
 
 
@@ -456,19 +472,26 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
             "preco_PMVG_max": None
             })
         
+        #adiciona as informações de alimentos obtidas
+        for (nome, qtd, duracao) in lalim:
+            resposta['lista_compostos'].append({
+            "nome": nome,
+            "quantidade": qtd,
+            "duracao": duracao
+            })    
         
         #resultado da aplicação da portaria em seus 6 incisos
         resposta['aplicacao_incisos'] = [False,
             (resposta['internacao'] or resposta['possui_consulta']) and not resposta['possui_outros_proibidos'],
-            False,
+            resposta['lista_compostos'] and not resposta['possui_outros_proibidos'],
             False,
             False,
             False]
 
 
         #custo total com LLMs
-        soma_prompt = sum([cdoutros[0], cmeds[0], chonor[0], CustoResumo[0], cinterna[0],cconsultas[0]])
-        soma_completion = sum([cdoutros[1], cmeds[1], chonor[1], CustoResumo[1], cinterna[1],cconsultas[1]])
+        soma_prompt = sum([cdoutros[0], cmeds[0], calim[0], chonor[0], CustoResumo[0], cinterna[0],cconsultas[0]])
+        soma_completion = sum([cdoutros[1], cmeds[1], calim[1], chonor[1], CustoResumo[1], cinterna[1],cconsultas[1]])
         resposta['custollm'] = CustoGpt4o(soma_prompt, soma_completion)
         resposta['tokensllm'] = (soma_prompt, soma_completion)
         
