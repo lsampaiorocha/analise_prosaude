@@ -12,17 +12,19 @@ import PyPDF2
 import re
 import os
 
+import pdfplumber
+
 # Imports despacho João Claudio
-"""
+
 import openai
 import csv
 import json
 import pandas as pd
 import requests
 from urllib.parse import urlencode
-from templates import TEMPLATE_MEDICAMENTO
+from templates import *
 from article import DocumentProcessor
-"""
+
 
 from datetime import datetime
 
@@ -123,6 +125,56 @@ def separar_pelo_id(path,id_andamento):
     pdf_document.close()
     return file_path,filename, primeira_pagina
 
+
+
+def atualizar_status(n_processo, id_andamento,session,momento): 
+
+    if momento == 1: 
+        status = 'Recebido'
+        insercaoAM = session.execute(text('''
+            UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
+            SET status=:status
+                                            
+            WHERE numerounico=:n_processo;
+        '''),
+        {
+            'status': status,
+            'n_processo': n_processo
+            
+        })
+        session.commit()
+        
+    elif momento == 2:
+        status = 'Em Análise'
+        insercaoAM = session.execute(text('''
+            UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
+            SET status=:status
+                                            
+            WHERE numerounico=:n_processo AND id_documento_analisado=:id_andamento;
+        '''),
+        {
+            'status': status,
+            'id_andamento': id_andamento,
+            'n_processo': n_processo
+            
+        })
+        session.commit()
+    elif momento == 3:
+        status = 'Analisado'
+        insercaoAM = session.execute(text('''
+            UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
+            SET status=:status
+                                            
+            WHERE numerounico=:n_processo AND id_documento_analisado=:id_andamento;
+        '''),
+        {
+            'status': status,
+            'id_andamento': id_andamento,
+            'n_processo': n_processo
+            
+        })
+    else: 
+        print('Não foi possível fazer a atualização do status') 
 
 # Função que irá identificar a primeira página do documento a ser analisado pela portaria
 def identificar_primeira_pagina(pdf_document, id_andamento):
@@ -258,6 +310,8 @@ def importar_processos(SelecaoAutomaticaDocumento=False):
       captura_ids_processo(row[1], id=None, SelecaoAutomaticaDocumento=SelecaoAutomaticaDocumento)
       
       print(f'Inserido: Processo de no. unico {row[1]} e id {row[0]}')
+    
+      atualizar_status(n_processo = tempNU,id_andamento = None,momento = 1,session= session) 
       
       ############    
 
@@ -301,11 +355,14 @@ def analisar_marcados():
   
   for resultado in resultados:
       n_processo = resultado[0]     
-      id_andamento = resultado[2]   
+      id_andamento = resultado[2]  
+      atualizar_status(n_processo,id_andamento,session,momento = 2) 
       resposta = analisa(n_processo, id_andamento)
       
       if isinstance(resposta, dict):
           grava_resultado_BD(n_processo, id_andamento, resposta, session)
+          gerar_despacho(n_processo,session,resposta)
+          atualizar_status(n_processo,id_andamento,session,momento = 3) 
       else:
           #return jsonify(resposta), 400
           print(resposta)
@@ -357,12 +414,14 @@ def analisar_processo(numero_processo):
   resultado = session.execute(query, {"numeroprocesso":numero_processo}).fetchone()
   n_processo =  resultado[0]
   id_andamento = resultado[2]
+  atualizar_status(n_processo,id_andamento,session,momento = 2) 
 
   resposta = analisa(n_processo, id_andamento)
   
   if isinstance(resposta, dict):
     grava_resultado_BD(n_processo, id_andamento, resposta, session)
-    #gerar_despacho(n_processo,session)
+    gerar_despacho(n_processo,session,resposta)
+    atualizar_status(n_processo,id_andamento,session,momento = 3) 
   else:
     return resposta
   
@@ -571,6 +630,9 @@ def captura_ids_processo(n_processo, id=None, SelecaoAutomaticaDocumento=False):
     metadata = MetaData()
     session = Session()
 
+    if SelecaoAutomaticaDocumento == True:
+        print('A Fazer')
+
     # Se um ID for passado, usa-o diretamente; caso contrário, faz a consulta
     if id is not None:
         id_analiseportaria = id
@@ -589,43 +651,69 @@ def captura_ids_processo(n_processo, id=None, SelecaoAutomaticaDocumento=False):
             return False
 
     # Captura os ids dos andamentos dentro de um processo
-    pdf_document = fitz.open(path)
+    pdf_document = pdfplumber.open(path)
+    document_info = []
 
-    for page_num in range(len(pdf_document)):
-        page = pdf_document.load_page(page_num)
-        texto = page.get_text("text")
+    for page_num,page in enumerate(pdf_document.pages):
+        texto = page.extract_text()
         
         # Verifica se a página tem o padrão "Num. \d{8} - Pág. \d+"
         if not re.search(r"Num\. \d{8} - Pág\. \d+", texto):
             # Unir linhas quebradas
             texto = re.sub(r"\n", " ", texto)
+            tables = page.extract_tables()
 
-            # Regex para encontrar linhas que correspondem à estrutura da tabela de índices
-            matches = re.findall(
-                r"(\d+)\s+(\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2})\s+(.+?)\s+(.+?)(?=(?:\d+\s+\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2})|$)",
-                texto
-            )
-            for match in matches:
-                id_doc = match[0]
-                data_assinatura = match[1]
-                documento = match[2]
-                tipo = match[3]
-                res =  session.execute(text('SELECT Max(id) as valor_max FROM db_pge.scm_robo_intimacao.tb_documentosautos')).fetchone()
-                max_id = res[0] + 1
-                query_check = text('SELECT numerounico,id_documento FROM db_pge.scm_robo_intimacao.tb_documentosautos WHERE numerounico = :numeroprocesso AND id_documento = :iddocumento')
-                check = session.execute(query_check, {"numeroprocesso":n_processo,"iddocumento": id_doc}).fetchone()
-                if check is None:
-                    insercao = session.execute(text('INSERT into db_pge.scm_robo_intimacao.tb_documentosautos (id, numerounico, id_documento, dt_assinatura, nome,  tipo, id_analiseportaria)values(:id, :numerounico, :id_documento,:dt_assinatura, :nome, :tipo, :id_analiseportaria)'),{'id':max_id,'numerounico':n_processo,'id_documento':id_doc,'dt_assinatura':data_assinatura,'nome':f'{documento}','tipo':tipo,'id_analiseportaria':id_analiseportaria})
-                else: 
-                    continue
+            for T in tables:
+                for table in T:
+                    if(None in table):
+                        table.remove(None)
+                    if(type(table[0]) == str):
+                        if(table[0].isnumeric() == False):
+                            continue
+                    else:
+                        i=0
+                        while(type(table[i])!=str):
+                            i+=1
+                        tempid_doc = document_info[-1][0]
+                        tempdata_assinatura = document_info[-1][1]
+                        tempdocumento = document_info[-1][2]+table[i]
+                        temptipo = document_info[-1][3]
+                        document_info.pop()
+                        document_info.append((tempid_doc, tempdata_assinatura, tempdocumento, temptipo))
+                        continue
+                    try:
+                        id_doc = table[0]
+                        data_assinatura = table[1].replace('\n',' ')
+                        documento = table[2].replace('\n',' ')
+                        tipo = table[3]
+                        document_info.append((id_doc, data_assinatura, documento, tipo))
+                    except Exception as e:
+                        print(f"Erro ao processar {n_processo}: {e}")
+                        continue 
+    for dados in document_info:
+        try:
+            id_doc = dados[0]
+            data_assinatura = dados[1].replace('\n',' ')
+            documento = dados[2].replace('\n',' ')
+            tipo = dados[3]
+            res =  session.execute(text('SELECT Max(id) as valor_max FROM db_pge.scm_robo_intimacao.tb_documentosautos')).fetchone()
+            max_id = res[0] + 1
+            query_check = text('SELECT numerounico,id_documento FROM db_pge.scm_robo_intimacao.tb_documentosautos WHERE numerounico = :numeroprocesso AND id_documento = :iddocumento')
+            check = session.execute(query_check, {"numeroprocesso":n_processo,"iddocumento": id_doc}).fetchone()
+            if check is None:
+                insercao = session.execute(text('INSERT into db_pge.scm_robo_intimacao.tb_documentosautos (id, numerounico, id_documento, dt_assinatura, nome,  tipo, id_analiseportaria)values(:id, :numerounico, :id_documento,:dt_assinatura, :nome, :tipo, :id_analiseportaria)'),{'id':max_id,'numerounico':n_processo,'id_documento':id_doc,'dt_assinatura':data_assinatura,'nome':f'{documento}','tipo':tipo,'id_analiseportaria':id_analiseportaria})
+            else: 
+                continue
+        except Exception as e:
+            print(f"Erro ao processar {n_processo}: {e}")
+            continue 
+
+
     session.commit()            
     pdf_document.close()
     if os.path.isfile(path):
         os.remove(path) 
     return True
-
-
-"""
 
 def encontrar_arquivo(nome_arquivo):
     
@@ -730,11 +818,89 @@ def grava_despacho_bd(fk,despacho,session):
         })
     session.commit()
 
-def gerar_despacho(n_processo,session):
+def selecionar_template(resultado_analise):
+    if resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and len(resultado_analise['lista_medicamentos']) > 0:       
+        data = {
+        "template": TEMPLATE_sentenca_MEDICAMENTO
+        }
+        print('Template Sentença - Medicamento')
+        
+    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and len(resultado_analise['lista_medicamentos']) > 0:
+        data = {
+        "template": TEMPLATE_DECISAO_MEDICAMENTO
+        }
+        print('Template Decisão - Medicamento')
+    elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and resultado_analise['internacao'] is True:
+        data = {
+        "template": TEMPLATE_sentenca_INTERNACAO
+        }
+        print('Template Sentença - Internação')
+        
+    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and resultado_analise['internacao'] is True:
+        data = {
+        "template": TEMPLATE_DECISAO_INTERNACAO
+        }
+        print('Template Decisão - Internação')
+    elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and len(resultado_analise['lista_compostos']) > 0:
+        data = {
+        "template": TEMPLATE_SENTENCA_COMPOSTO_ALIMENTAR
+        }
+        print('Template Sentença - Composto Alimentar')
+
+    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and len(resultado_analise['lista_compostos']) > 0:
+        data = {
+        "template": TEMPLATE_DECISAO_COMPOSTO_ALIMENTAR
+        }
+        print('Template Decisão- Composto Alimentar')
+    elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and (('cirurgia' in resultado_analise['lista_outros']) or ('procedimento' in resultado_analise['lista_outros'])):
+        data = {
+        "template": TEMPLATE_sentenca_CIRURGIA
+        }
+        print('Template Sentença - Cirurgia')
+
+    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and (('cirurgia' in resultado_analise['lista_outros']) or ('procedimento' in resultado_analise['lista_outros'])):
+        data = {
+        "template": TEMPLATE_DECISAO_cirugia
+        }
+        print('Template Decisão - Cirurgia')
+
+    elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and ('exame' in resultado_analise['lista_outros']):
+        data = {
+        "template": TEMPLATE_sentenca_EXAMES
+        }
+        print('Template Sentença - Exame')    
+
+    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and ('exame' in resultado_analise['lista_outros']):
+        data = {
+        "template": TEMPLATE_DECISAO_exame
+        }
+        print('Template Decisão - Exame')  
+
+    elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and (('consulta' in resultado_analise['lista_outros']) or ('atendimento' in resultado_analise['lista_outros'])):
+        data = {
+        "template": TEMPLATE_sentenca_CONSULTA
+        }
+        print('Template Sentença - Consulta')  
+
+    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and (('consulta' in resultado_analise['lista_outros']) or ('atendimento' in resultado_analise['lista_outros'])):
+        data = {
+        "template": TEMPLATE_DECISAO_consulta
+        }
+        print('Template Decisão - Consulta')      
+
+    else:  
+
+        data = False
+        print('Sem Template')
+        
+    return data
+
+
+def gerar_despacho(n_processo,session,resultado_analise):
 
     ### Parte responsável pela  busca no banco de dados:
     # Pesquisa o
-    query = text('SELECT fk_autosprosaude,possui_outros,possui_medicamentos,possui_condenacao_honorarios,aplica_portaria,numerounico FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.analisado is true AND ta.numerounico =:numeroprocesso')
+    query = text('SELECT ta.fk_autosprosaude,ta.possui_outros,ta.possui_medicamentos,ta.possui_condenacao_honorarios,ta.aplica_portaria,ta.numerounico,ta.dt_processado FROM scm_robo_intimacao.tb_analiseportaria ta INNER JOIN (SELECT numerounico, Max(dt_processado) AS data_max FROM db_pge.scm_robo_intimacao.tb_analiseportaria tb GROUP BY numerounico) AS tabela_data_max ON tabela_data_max.numerounico =  ta.numerounico AND tabela_data_max.data_max = ta.dt_processado  WHERE ta.analisado is true AND ta.numerounico =:numeroprocesso')
     resultado = session.execute(query, {"numeroprocesso":n_processo}).fetchone()
 
     nome_arquivo =  resultado[0]
@@ -826,9 +992,11 @@ def gerar_despacho(n_processo,session):
     url = f'{base_url}/projeto-template?{encoded_params}'
     print(url)
 
-    data = {
-    "template": TEMPLATE_MEDICAMENTO
-    }
+    data = selecionar_template(resultado_analise)
+
+    if data is False:
+        return False
+
     with requests.Session() as client:
         # Make the GET request
         response = client.post(
@@ -849,8 +1017,7 @@ def gerar_despacho(n_processo,session):
     grava_despacho_bd(nome_arquivo,despacho,session)
 
 
-
-
+"""
 def grava_resultado_BD(n_processo, id_andamento, resultado, session):
 
     #RESUMO
@@ -1018,27 +1185,9 @@ def grava_resultado_BD(n_processo, id_andamento, resultado, session):
 
         insercaoAM = session.execute(text('INSERT into db_pge.scm_robo_intimacao.tb_medicamentos (id, id_analiseportaria, nome_principio, nome_comercial, dosagem, possui_anvisa, registro_anvisa, fornecido_SUS, valor) values(:id, :id_analiseportaria, :nome_principio, :nome_comercial, :dosagem, :possui_anvisa, :registro_anvisa, :fornecido_SUS, :valor)'),{'id':f'{idmedicamento}','id_analiseportaria':f'{idportaria}','nome_principio':f'{nome_principio}','nome_comercial':f'{nome_comercial}','dosagem':f'{dosagem}','possui_anvisa':f'{possuianvisa}','registro_anvisa':f'{registroanvisa}','fornecido_SUS':f'{ofertaSUS}','valor':f'{precoPMVG}'})
     session.commit()
-
-
-if __name__ =="__main__":
-    engine = create_engine(DATABASE_URL)
-    Session = sessionmaker(bind=engine)
-    
-    # Metadados globais
-    metadata = MetaData()
-    # Registrar a tabela tb_autosprosaude no metadata
-    tb_autosprosaude = Table(
-        'tb_autosprosaude', metadata,
-        Column('id', Integer, primary_key=True),
-        schema='scm_robo_intimacao'
-    )
-        
-    
-    #Marcador para ignorar linha
-    marca = 0
-
-    session = Session()
-    gerar_despacho("3008970-53.2024.8.06.0001",session)
-    
-    
 """
+
+#if __name__ =="__main__":
+#    captura_ids_processo('0005003-57.2013.8.06.0156', id=None, SelecaoAutomaticaDocumento=False)
+    
+    

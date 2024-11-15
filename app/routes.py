@@ -6,9 +6,9 @@ from AnalisePortaria import *
 from .logica import *
 
 #JC
-#from urllib.parse import unquote
-#from apps import config_build
-#from projai.apps import app_project_inovafit
+from urllib.parse import unquote
+from apps import config_build
+from projai.apps import app_project_inovafit
 
 
 def configure_routes(app):
