@@ -115,10 +115,12 @@ def AnaliseOutrosRegex(pages, Verbose=False):
                        'equipo', 'sensor de glicose', 'insulina',  'umidificador', 'mascara', 'agulha']
     """
     
-    palavras_filtro_permitidos = ['insulina', 'frasco', 'procedimento', 'consulta', 'exame', 'psicólogo', 'psiquiatr',
-                                  'tratamento', 'sessão de ', 'cirurgia', 
-                                  'fonoaudiólogo', 'fisioterapia', 'atendimento', 
+    palavras_filtro_permitidos = ['insulina', 'frasco', 'hidratante', 'umidificador', 'mascara', 
+				  'agulha', 'sonda', 'frasco', 'fralda', 'álcool', 'atadura', 
+                                  'tubo', 'gase', 'luvas', 'esparadrapo', 'algodão', 'colchão','seringa', 'aspirador', 
+                                  'equipo', 'sensor', 'cama', 'cadeira de roda'
                                   ]
+
     
     
     # Aplicando a função de normalização para lidar com acentos e assegurar espaço em branco no início
@@ -173,11 +175,7 @@ def AnaliseOutrosRegex(pages, Verbose=False):
                                  'suplementação alimentar', 'compostos alimentares', 'fonoaudiólogo', 'fisioterapia', 'CPAP', 
                                  'aparelho', 'BIPAP','psicopedagógico', 'psicólogo', 'psiquiatr',]
     """
-    palavras_filtro_proibidas = ['hidratante', 'umidificador', 'mascara', 'agulha', 'sonda', 'frasco', 'fralda', 'álcool', 'atadura', 
-                                 'tubo', 'gase', 'luvas', 'esparadrapo', 'algodão', 'colchão','seringa', 'aspirador', 
-                                 'equipo', 'sensor', 'aliment', 'enteral', 'dieta', 'Energy', 'cama',  
-                                 'cadeira de roda', 'suplementação alimentar', 'compostos alimentares', 
-                                 'CPAP', 'aparelho', 'BIPAP','psicopedagógico']
+    palavras_filtro_proibidas = []
     
     # Aplicando a função de normalização para lidar com acentos e assegurar espaço em branco no início
     #regex_patterns = [r'\b' + normalize_regex(re.escape(keyword)).replace(r'\ ', r'\s+') + r'\b' for keyword in palavras_filtro]
