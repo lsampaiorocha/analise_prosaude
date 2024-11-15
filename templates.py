@@ -227,3 +227,418 @@ TEMPLATE_ETP = {
     }
 }
 
+
+
+TEMPLATE_sentenca_MEDICAMENTO= {
+    "header": "# Modelo para elaboração de despacho.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção. Exemplo: '1. Identificação do Tipo de Decisão' significa a primeira seção.",
+        "Cada número seguido de um ponto é uma subseção. Exemplo: '2.1 Objeto da Decisão' significa a primeira subseção da seção 2.",
+        "Implemente subsubseções se necessário."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": "Crie um despacho judicial para a concessão de medicamentos, baseando-se nos dados fornecidos e nos  seguintes exemplos fornecidos de decisões anteriores, o texto não deve ter tópicos e dever ser fornecido em um único parágrafo.O texto não pode vir com todas as letras em maíusculo.",
+            "elements": [
+                """Exemplos:
+1. R.H. TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA. FORNECIMENTO DOS MEDICAMENTOS QUETIAPINA 100MG, PRAMIPEXOL 0,75MG E CARBAMAZEPINA CR 200 MG AO PACIENTE. FÁRMACOS REGISTRADOS NA ANVISA, CUJO CUSTO ANUAL NÃO SUPERA O TETO DE 60 SALÁRIOS-MÍNIMOS (CERCA DE R$7.500,00). AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO. SEM CUSTAS NEM HONORÁRIOS. CONFORME PRECEDENTE DESTA SETORIAL (0202503-31.2022.8.06.0055), FOI CONCEDIDA A DISPENSA DE APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO PELO GABINETE NESSES CASOS EM QUE O CUSTO DO TRATAMENTO ANUAL ENQUADRA-SE NO TETO DOS JUIZADOS DA FAZENDA PÚBLICA. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, I. OPINO PELA NÃO INTERPOSIÇÃO DO RECURSO EM TESE CABÍVEL. OFICIAR A SESA PARA CONHECIMENTO DE SENTENÇA E COMPROVAR CUMPRIMENTO DIRETAMENTE NOS AUTOS. APÓS, CONFORME ORIENTAÇÃO DA CHEFIA, ARQUIVAR A PASTA.
+2. R.H. TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA. FORNECIMENTO DO MEDICAMENTO DULOXETINA. CUSTO ANUAL DO TRATAMENTO: CERCA DE R$ 1.300,00 (ABAIXO DO TETO DO RPV). FÁRMACO REGISTRADO NA ANVISA. AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO. SEM CUSTAS. HONORÁRIOS EXCLUSIVAMENTE EM DESFAVOR DO MUNICÍPIO. MEDICAÇÃO COM CUSTO ANUAL INFERIOR AO VALOR ESTIPULADO PARA EXPEDIÇÃO DE REQUISIÇÃO DE PEQUENO VALOR. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, I. EMBORA SEJA CABÍVEL A INTERPOSIÇÃO DE RECURSO FUNDADO NO TEMA 793, OPINO PELA NÃO INTERPOSIÇÃO EM RAZÃO DO BAIXO CUSTO DO MEDICAMENTO PLEITEADO. OFICIAR A SESA PARA CONHECIMENTO DE SENTENÇA E COMPROVAR CUMPRIMENTO DIRETAMENTE NOS AUTOS. APÓS, AO ARQUIVO CONFORME ORIENTAÇÃO DO PROCURADOR RESPONSÁVEL.
+3. R.H. TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA. FORNECIMENTO DO MEDICAMENTO XARELTO À PACIENTE. FÁRMACO REGISTRADO NA ANVISA. AUSÊNCIA DE DANO MORAL. SEM CUSTAS NEM HONORÁRIOS. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, I. OPINO PELA NÃO INTERPOSIÇÃO DO RECURSO EM TESE CABÍVEL. OFICIAR A SESA PARA CONHECIMENTO DE SENTENÇA E COMPROVAR CUMPRIMENTO DIRETAMENTE NOS AUTOS. APÓS, TRAMITAR À CHEFIA.
+4. R.H. TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA. FORNECIMENTO DO MEDICAMENTO RITUXIMABE. FÁRMACO REGISTRADO NA ANVISA, MAS NÃO PREVISTO NA RENAME. CUSTO ANUAL DO TRATAMENTO INFERIOR AO TETO DE 60 SALÁRIOS MÍNIMOS, CONFORME RELATÓRIO APRESENTADO PELO NATJUS - ID 62701067. AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO. SEM CUSTAS E SEM HONORÁRIOS (AUSÊNCIA DE FIXAÇÃO). APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, I. EMBORA SEJA CABÍVEL A INTERPOSIÇÃO DE RECURSO FUNDADO NO TEMA 793, OPINO PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO EM RAZÃO DO BAIXO CUSTO DO MEDICAMENTO PLEITEADO, NOS TERMOS DO PRECEDENTE Nº 0202503-31.2022.8.06.0055. DISPENSA DE ATUAÇÃO PARA MEDICAMENTOS NÃO INCORPORADOS COM CUSTO ANUAL NO PATAMAR DE 60 SALÁRIOS MÍNIMOS. OFICIAR A SESA PARA CONHECER SENTENÇA E COMPROVAR CUMPRIMENTO DIRETAMENTE NOS AUTOS. APÓS, AO ARQUIVO, CONFORME ORIENTAÇÃO DA CHEFIA.
+
+
+Informaçoes que devem estar no despacho a ser gerado:
+1. Identificação do Despacho
+2. Decisão sobre o Pleito
+3. Especificação do Medicamento
+4. Danos Morais
+6. Aplicação de Normativas Específicas: verificar se neste caso existe aplicação de portaria ou não.
+7. Direcionamentos Finais
+
+Utilize uma linguagem formal e técnica adequada para um contexto jurídico, incorporando os elementos e o estilo dos exemplos dados para criar um novo despacho judicial simulado."""
+            ]
+        }
+    }
+}
+
+
+
+TEMPLATE_sentenca_CONSULTA = {
+    "header": "# Modelo para elaboração de despacho para concessão de consultas.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção. Exemplo: '1. Identificação do Tipo de Decisão' significa a primeira seção.",
+        "Cada número seguido de um ponto é uma subseção. Exemplo: '2.1 Objeto da Decisão' significa a primeira subseção da seção 2.",
+        "Implemente subsubseções se necessário."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": "Crie um despacho judicial para a concessão de consultas, baseando-se nos dados fornecidos e nos exemplos fornecidos de decisões anteriores. O texto deve estar em um único parágrafo, sem tópicos.O texto não pode vir com todas as letras em maíusculo.",
+            "elements": [
+                """Exemplos:
+1. R.H. TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA PARA DETERMINAR A REALIZAÇÃO DE CONSULTA COM PNEUMOLOGISTA. AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO. SEM CUSTAS NEM HONORÁRIOS. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II. OPINO PELA NÃO INTERPOSIÇÃO DO RECURSO EM TESE CABÍVEL. OFICIAR A SESA PARA CONHECIMENTO DE SENTENÇA E COMPROVAR CUMPRIMENTO DIRETAMENTE NOS AUTOS. APÓS, À CHEFIA PARA RATIFICAÇÃO E ARQUIVAR A PASTA.
+                
+2. R.H. TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA. FORNECIMENTO DE AVALIAÇÃO COM NEUROCIRURGIÃO AO PACIENTE. AUSÊNCIA DE CONDENAÇÃO EM DANO MORAL. SEM CUSTAS NEM HONORÁRIOS. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II. OPINO PELA NÃO INTERPOSIÇÃO DO RECURSO EM TESE CABÍVEL. HÁ INFORMAÇÃO NOS AUTOS DE REALIZAÇÃO DA CONSULTA (FLS. 62/64). À CHEFIA PARA RATIFICAÇÃO E ARQUIVAR A PASTA.
+                
+3. (COMARCA DE LIMOEIRO DO NORTE) R.H. TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA. FORNECIMENTO DE CONSULTA COM NEUROLOGISTA. AUSÊNCIA DE CONDENAÇÃO EM DANO MORAL. SEM CUSTAS. HONORÁRIOS ADVOCATÍCIOS EM R$ 600,00 AO ADVOGADO PARTICULAR DA PARTE AUTORA. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II. E EM RELAÇÃO AOS HONORÁRIOS APLICA-SE O PRECEDENTE DE DISPENSA Nº 00302503020078060001. OPINO PELA NÃO INTERPOSIÇÃO DO RECURSO EM TESE CABÍVEL. OFICIAR A SESA PARA CONHECIMENTO DE SENTENÇA. APÓS, A DIREÇÃO SUPERIOR. 
+                
+4. R.H. TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA. REALIZAÇÃO DE CONSULTA COM MÉDICO OFTALMOLOGISTA E EXAME. AUSÊNCIA DE PEDIDO DE DANOS MORAIS. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II. SEM HONORÁRIOS. OPINO PELA NÃO INTERPOSIÇÃO DO RECURSO EM TESE CABÍVEL. ARQUIVAR A PASTA.
+
+Informações que devem estar no despacho a ser gerado:
+1. Identificação do Despacho
+2. Decisão sobre o Pleito
+3. Especialidade da Consulta
+4. Danos Morais:verificar se neste caso existe danos morais ou não.
+6. Aplicação de Normativas Específicas: verificar se neste caso existe aplicação de portaria ou não.
+7. Direcionamentos Finais
+
+Utilize uma linguagem formal e técnica adequada para um contexto jurídico, incorporando os elementos e o estilo dos exemplos dados para criar um novo despacho judicial simulado."""
+            ]
+        }
+    }
+}
+
+
+TEMPLATE_sentenca_INTERNACAO = {
+    "header": "# Modelo para elaboração de despacho judicial para concessão de internação.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção. Exemplo: '1. Identificação do Tipo de Decisão' significa a primeira seção.",
+        "Cada número seguido de um ponto é uma subseção. Exemplo: '2.1 Objeto da Decisão' significa a primeira subseção da seção 2.",
+        "Implemente subsubseções se necessário."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": "Crie um despacho judicial para a concessão de internação hospitalar, baseando-se nos dados fornecidos e nos seguintes exemplos de decisões anteriores. O texto não deve ter tópicos e deve ser fornecido em um único parágrafo. O texto não pode vir com todas as letras em maiúsculo.",
+            "elements": [
+                """Exemplos:
+1. R.H. JULGADA PROCEDENTE A AÇÃO AUTORAL, COM RESOLUÇÃO DO MÉRITO, CONFIRMANDO A TUTELA ANTECIPADA PARA FORNECIMENTO DE VAGA EM LEITO DE UTI. NÃO HOUVE CONDENAÇÃO EM DANOS MORAIS, E OS HONORÁRIOS FORAM DISPENSADOS. APLICA-SE A PORTARIA 01/2017, ART. 1º, INCISO II. ORIENTO PELA NÃO INTERPOSIÇÃO DE RECURSO, EM CONFORMIDADE COM RECENTES ENTENDIMENTOS DA PGE. CASO ARQUIVADO PELA ASSESSORIA SEGUNDO OS PRECEDENTES NO PROCESSO 3010202-13.2023.8.06.0001. ENCAMINHAR PARA ARQUIVO.
+2. R.H. SENTENÇA PROCEDENTE, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA QUE DETERMINOU A DISPONIBILIZAÇÃO DE LEITO DE UTI. AUSÊNCIA DE CUSTAS E HONORÁRIOS ADVOCATÍCIOS. SEM DANOS MORAIS. PORTARIA 01/2017, ART. 1º, II. ORIENTAÇÃO PARA NÃO INTERPOR RECURSO, ALINHADA AOS PRECEDENTES DA PGE EM CASOS ANÁLOGOS, COMO NO PROCESSO 3022147-88.2023.8.06.0001. ARQUIVAR PASTA COM BASE NA INSTRUÇÃO DA ASSESSORIA.
+3. R.H. PROCEDÊNCIA DA AÇÃO COM RESOLUÇÃO DO MÉRITO. TUTELA ANTECIPADA PARA LEITO DE UTI CONFIRMADA. SEM DETERMINAÇÃO DE DANOS MORAIS OU HONORÁRIOS ADVOCATÍCIOS. APLICA-SE A PORTARIA 01/2017, ART. 1º, II. NÃO CABE RECURSO, CONFORME RECENTE ENTENDIMENTO DA PGE, PROCESSO 3005430-19.2023.8.06.0001. SOLICITO ARQUIVAMENTO DO PROCESSO PELA ASSESSORIA, CONFORME DETERMINADO EM DECISÕES ANTERIORES.
+4. R.H. SENTENÇA QUE JULGA PROCEDENTE O PEDIDO, CONFIRMANDO A TUTELA ANTECIPADA QUE GARANTIU O FORNECIMENTO DE LEITO DE UTI AO AUTOR. SEM CUSTAS, HONORÁRIOS OU CONDENAÇÃO EM DANOS MORAIS. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II. A RECOMENDAÇÃO É PARA NÃO INTERPOR RECURSO, EM LINHA COM A JURISPRUDÊNCIA RECENTE DA PGE, COMO DEMONSTRADO NO PROCESSO 3033315-15.2023.8.06.0001. ENCAMINHAR PARA ARQUIVAMENTO PELA ASSESSORIA.
+
+
+Informações que devem estar no despacho a ser gerado:
+1. Identificação do Despacho
+2. Decisão sobre o Pleito
+3. Especificação do Leito ou Tipo de Internação
+4. Danos Morais:verificar se neste caso existe danos morais ou não.
+5. Custas e Honorários:verificar se neste caso existe custas e pagamentos de honorários.
+6. Aplicação de Normativas Específicas:verificar se neste caso existe aplicação de portaria ou não.
+7. Direcionamentos Finais
+
+Utilize uma linguagem formal e técnica adequada para um contexto jurídico, incorporando os elementos e o estilo dos exemplos dados para criar um novo despacho judicial simulado."""
+            ]
+        }
+    }
+}
+
+TEMPLATE_sentenca_EXAMES = {
+    "header": "# Modelo para elaboração de despacho para concessão de exames médicos.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção. Exemplo: '1. Identificação do Tipo de Decisão' significa a primeira seção.",
+        "Cada número seguido de um ponto é uma subseção. Exemplo: '2.1 Objeto da Decisão' significa a primeira subseção da seção 2.",
+        "Implemente subsubseções se necessário."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": "Crie um despacho judicial para a concessão de exames médicos, baseando-se nos dados fornecidos e nos seguintes exemplos de decisões anteriores, o texto não deve ter tópicos e deve ser fornecido em um único parágrafo. O texto não pode vir com todas as letras em maiúsculo.",
+            "elements": [
+                """Exemplos:
+1. R.H. TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA. REALIZAÇÃO DO EXAME DE HISTEROSSALPINGOGRAFIA. LAUDO PÚBLICO. INEXISTÊNCIA DE CONDENAÇÃO DE INDENIZAÇÃO POR DANOS MORAIS. SEM CUSTAS NEM HONORÁRIOS. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II. OPINO PELA NÃO INTERPOSIÇÃO DO RECURSO EM TESE CABÍVEL. OFICIAR A SESA PARA CONHECIMENTO DE SENTENÇA E COMPROVAR CUMPRIMENTO DIRETAMENTE NOS AUTOS. APÓS, À CHEFIA PARA RATIFICAÇÃO E ARQUIVAR A PASTA.
+2. R.H. TRATA-SE DE SENTENÇA JULGANDO PARCIALMENTE PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA. REALIZAÇÃO DO EXAME DE BIÓPSIA HEPÁTICA GUIADA POR TC NA PARTE AUTORA. LAUDO PÚBLICO (HOSPITAL MATERNIDADE SÃO VICENTE DE PAULO). REJEIÇÃO DO PEDIDO DE CONDENAÇÃO DE INDENIZAÇÃO POR DANOS MORAIS. SUCUMBÊNCIA RECÍPROCA - CUSTAS E HONORÁRIOS EM DESFAVOR DA PARTE AUTORA, COM EXIGIBILIDADE SUSPENSA EM RAZÃO DA GRATUIDADE DA JUSTIÇA. HONORÁRIOS ARBITRADOS EM R$1.000,00 EM FAVOR DO ADVOGADO PARTICULAR DA PARTE AUTORA. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II, E EM RELAÇÃO AOS HONORÁRIOS APLICA-SE O PRECEDENTE DE DISPENSA Nº 00302503020078060001, QUE DIZ SER DISPENSADO RECURSO QUANDO O VALOR DOS HONORÁRIOS FOREM MENORES QUE R$ 3.000,00 REAIS. OPINO PELA NÃO INTERPOSIÇÃO DO RECURSO EM TESE CABÍVEL. OFICIAR A SESA PARA CONHECIMENTO DE SENTENÇA E COMPROVAR CUMPRIMENTO DIRETAMENTE NOS AUTOS. APÓS, À CHEFIA PARA RATIFICAÇÃO E ARQUIVAR A PASTA.
+3. R.H. TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA. REALIZAÇÃO DO EXAME DE EXOMA.  INEXISTÊNCIA DE CONDENAÇÃO DE INDENIZAÇÃO POR DANOS MORAIS. SEM CUSTAS NEM HONORÁRIOS. EXAME JÁ REALIZADO. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II. OPINO PELA NÃO INTERPOSIÇÃO DO RECURSO EM TESE CABÍVEL. À CHEFIA PARA RATIFICAÇÃO DA DISPENSA DE ATUAÇÃO.
+4. R.H. COMARCA DO CRATO. TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA. REALIZAÇÃO DO EXAME DE CINTILOGRAFIA RENAL DMSA E ESTUDO URODINÂMICO DTPA. EXAME JÁ REALIZADO. AUSÊNCIA DE PEDIDO DE DANOS MORAIS. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II. SEM HONORÁRIOS. OPINO PELA NÃO INTERPOSIÇÃO DO RECURSO EM TESE CABÍVEL. ARQUIVAR A PASTA.
+
+Informações que devem estar no despacho a ser gerado:
+1. Identificação do Despacho
+2. Decisão sobre o Pleito
+3. Especificação dos Exames Médicos
+4. Danos Morais:verificar se neste caso existe danos morais ou não.
+5. Aplicação de Normativas Específicas:verificar se neste caso existe aplicação de portaria ou não.
+6. Direcionamentos Finais
+
+Utilize uma linguagem formal e técnica adequada para um contexto jurídico, incorporando os elementos e o estilo dos exemplos dados para criar um novo despacho judicial simulado."""
+            ]
+        }
+    }
+}
+
+
+TEMPLATE_sentenca_CIRURGIA ={
+    "header": "# Modelo para elaboração de despacho de concessão de cirurgia.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção. Exemplo: '1. Identificação do Tipo de Decisão' significa a primeira seção.",
+        "Cada número seguido de um ponto é uma subseção. Exemplo: '2.1 Objeto da Decisão' significa a primeira subseção da seção 2.",
+        "Implemente subsubseções se necessário."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": "Crie um despacho judicial para a concessão de cirurgias, baseado nos dados fornecidos e nos exemplos apresentados anteriormente de decisões sobre cirurgias. O texto deve ser um único parágrafo, com linguagem formal e técnica adequada para contexto jurídico. Não utilize letras maiúsculas excessivas.",
+            "elements": [
+                """Exemplos:
+1. R.H. Trata-se de sentença julgando procedente o pleito autoral, com resolução do mérito, ratificando a decisão antecipatória de tutela anteriormente concedida. Realização de cirurgia bariátrica. Ausência de pedido de danos morais. Aplicação da Portaria 01/2017, art. 1º, II. Honorários fixados em 10% do valor da causa. Valor da causa: R$ 20.000,00 (vinte mil reais). De acordo com precedentes recentes desta PGE, 3003071-11.2023.8.06.0001 e 00887294520098060001, foi autorizado o arquivamento direto das pastas pela assessoria nos processos que tenham referido tema. Arquivar a pasta.
+2. R.H. Trata-se de sentença julgando procedente o pleito autoral, com resolução do mérito, ratificando a decisão antecipatória de tutela anteriormente concedida. Realização de vitrectomia em olho direito. Ausência de pedido de danos morais. Aplicação da Portaria 01/2017, art. 1º, II. Sem honorários. De acordo com precedentes recentes desta PGE, 3003071-11.2023.8.06.0001, foi autorizado o arquivamento direto das pastas pela assessoria nos processos que tenham referido tema. Arquivar a pasta.
+3. R.H. Trata-se de sentença julgando procedente o pleito autoral, com resolução do mérito, ratificando a decisão antecipatória de tutela anteriormente concedida. Realização de cirurgia de prótese de quadril. Ausência de pedido de danos morais. Aplicação da Portaria 01/2017, art. 1º, II. Honorários fixados em 15% do valor da causa. Valor da causa: R$ 35.000,00 (trinta e cinco mil reais). De acordo com precedentes recentes desta PGE, 3003071-11.2023.8.06.0001, foi autorizado o arquivamento direto das pastas pela assessoria nos processos que tenham referido tema. Arquivar a pasta.
+4. R.H. Trata-se de sentença julgando procedente o pleito autoral, com resolução do mérito, ratificando a decisão antecipatória de tutela anteriormente concedida. Realização de cirurgia de hérnia inguinal. Ausência de pedido de danos morais. Aplicação da Portaria 01/2017, art. 1º, II. Honorários fixados em 12% do valor da causa. Valor da causa: R$ 10.000,00 (dez mil reais). De acordo com precedentes recentes desta PGE, 3003071-11.2023.8.06.0001, foi autorizado o arquivamento direto das pastas pela assessoria nos processos que tenham referido tema. Arquivar a pasta.
+
+Informações que devem estar no despacho a ser gerado:
+1. Identificação do Despacho
+2. Decisão sobre o Pleito
+3. Especificação da Cirurgia
+4. Danos Morais:verificar se neste caso existe danos morais ou não.
+5. Aplicação de Normativas Específicas:verificar se neste caso existe aplicação de portaria ou não.
+6. Direcionamentos Finais
+
+Utilize uma linguagem formal e técnica adequada para o contexto jurídico, incorporando os elementos e o estilo dos exemplos dados para criar um novo despacho judicial simulado."""
+            ]
+        }
+    }
+}
+
+TEMPLATE_DECISAO_MEDICAMENTO= {
+    "header": "# Modelo para elaboração de despacho de decisão de fornecimento de medicamentos.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção. Exemplo: '1. Identificação do Tipo de Decisão' significa a primeira seção.",
+        "Cada número seguido de um ponto é uma subseção. Exemplo: '2.1 Objeto da Decisão' significa a primeira subseção da seção 2.",
+        "Implemente subsubseções se necessário."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": "Crie um despacho judicial para a concessão de medicamentos, baseando-se nos dados fornecidos e nos exemplos abaixo, sem dividir em tópicos e em um único parágrafo. O texto deve ser formal e técnico, sem uso excessivo de maiúsculas.",
+            "elements": [
+                """Exemplos:
+1. R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DO MEDICAMENTO DENOSUMABE, REGISTRADO NA ANVISA. CUSTO APROXIMADO DE R$ 790,00, COM CUSTO ANUAL INFERIOR A 60 SALÁRIOS MÍNIMOS. NÃO HÁ INDÍCIOS DE DANO MORAL. LAUDO INDICA NECESSIDADE CLÍNICA PARA A JUDICIALIZAÇÃO. CONFORMIDADE COM A PORTARIA 01/2017, ART. 1º, I E ART. 2°, I E II. SEGUINDO OS PRECEDENTES DESTA PGE (EXEMPLO: 0202503-31.2022.8.06.0055), OPINO PELA NÃO INTERPOSIÇÃO DE RECURSO. ARQUIVAMENTO CONFORME ORIENTAÇÃO DA CHEFIA.
+
+2. R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DO MEDICAMENTO INSULINA GLARGINA, REGISTRADO NA ANVISA. VALOR DE R$ 450,00 E CUSTO ANUAL ABAIXO DE 30 SALÁRIOS MÍNIMOS. AUSÊNCIA DE DANO MORAL. LAUDO FUNDAMENTA A NECESSIDADE DO TRATAMENTO. CONFORMIDADE COM A PORTARIA 02/2018, ART. 3º, I E ART. 5º, II. BASEADO NOS PRECEDENTES ATUAIS DA PGE (EXEMPLO: 0403049-25.2023.8.06.0012), OPINO PELA NÃO APRESENTAÇÃO DE DEFESA OU RECURSO. PASTA DEVE SER ARQUIVADA SEGUNDO INSTRUÇÕES DA CHEFIA.
+
+3. R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DO MEDICAMENTO NIVOLUMABE, DEVIDAMENTE REGISTRADO NA ANVISA. PREÇO DE R$ 1.200,00, COM CUSTO ANUAL INFERIOR A 40 SALÁRIOS MÍNIMOS. INEXISTÊNCIA DE DANO MORAL. LAUDO DESTACA A IMPORTÂNCIA DO TRATAMENTO. CONFORMIDADE COM A PORTARIA 03/2019, ART. 2º, I E III. CONSIDERANDO OS PRECEDENTES (EXEMPLO: 0301984-22.2023.8.06.0015), NÃO É NECESSÁRIA DEFESA OU RECURSO. ARQUIVAR A PASTA DE ACORDO COM AS INSTRUÇÕES DA CHEFIA.
+
+4. R.H. DECISÃO INTERLOCUTÓRIA DEFERINDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DO MEDICAMENTO ADALIMUMABE, COM REGISTRO NA ANVISA. CUSTO DO MEDICAMENTO R$ 600,00, E CUSTO ANUAL DO TRATAMENTO ABAIXO DE 35 SALÁRIOS MÍNIMOS. AUSÊNCIA DE DANO MORAL. LAUDO APRESENTADO COMO FUNDAMENTO PARA A JUDICIALIZAÇÃO. CONFORMIDADE COM A PORTARIA 05/2020, ART. 1º, I E II. SEGUINDO OS PRECEDENTES (EXEMPLO: 0705893-12.2022.8.06.0047), OPINO PELA NÃO APRESENTAÇÃO DE DEFESA OU RECURSO. PASTA DEVE SER ARQUIVADA, CONFORME INSTRUÇÃO DA CHEFIA.
+
+
+Informações que devem estar no despacho a ser gerado:
+1. Identificação do Despacho
+2. Decisão sobre o Pleito
+3. Especificação do Medicamento
+4. Danos Morais:verificar se neste caso existe danos morais ou não.
+6. Aplicação de Normativas Específicas:verificar se neste caso existe aplicação de portaria ou não.
+7. Direcionamentos Finais
+
+Utilize uma linguagem formal e técnica adequada para um contexto jurídico, incorporando os elementos e o estilo dos exemplos dados para criar um novo despacho judicial simulado."""
+            ]
+        }
+    }
+}
+
+
+TEMPLATE_DECISAO_INTERNACAO= {
+    "header": "# Modelo para elaboração de despacho de decisão de fornecimento de leitos de UTI.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção. Exemplo: '1. Identificação do Tipo de Decisão' significa a primeira seção.",
+        "Cada número seguido de um ponto é uma subseção. Exemplo: '2.1 Objeto da Decisão' significa a primeira subseção da seção 2.",
+        "Implemente subsubseções se necessário."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": "Crie um despacho judicial para a concessão de leitos de UTI, baseando-se nos dados fornecidos e nos exemplos abaixo, sem dividir em tópicos e em um único parágrafo. O texto deve ser formal e técnico, sem uso excessivo de maiúsculas.",
+            "elements": [
+                """Exemplos:
+1. R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A INTERNAÇÃO DA PACIENTE EM LEITO DE UTI, FACULTADO O SEU CUMPRIMENTO NO ÂMBITO DA REDE PÚBLICA. AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO (UPA ITAPERI). APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2°, I E II. OPINO PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. ARQUIVAR A PASTA.
+
+2. R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A INTERNAÇÃO DA PARTE AUTORA EM LEITO ESPECIALIZADO DE UNIDADE PÚBLICA TERCIÁRIA. AUSÊNCIA DE PEDIDO DE DANOS MORAIS. LAUDO PÚBLICO (UPA- AUTRAN NUNES). APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2º I E II. OPINO PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. À CHEFIA PARA RATIFICAÇÃO DA DISPENSA. APÓS, ARQUIVAR A PASTA.
+
+3. R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A INTERNAÇÃO COMPULSÓRIA DO AUTOR. AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO. APLICAÇÃO ANALÓGICA DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2°, I E II CONFORME PRECEDENTE RECENTE DESTA CASA Nº 66070620138060107. OPINO PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. DISPENSA AUTORIZADA, COM BASE EM PRECEDENTES DESTA PGE, NOS TERMOS DO DESPACHO DO GABINETE NO PROCESSO Nº 3003071-11.2023.8.06.0001. ARQUIVAR.
+
+4. R.H. COMARCA DE ARACOIABA. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A INTERNAÇÃO PARA REALIZAÇÃO DE PROCEDIMENTO CIRÚRGICO PARA TRATAMENTO DE FRATURA DE ÚMERO. AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO (PREFEITURA DE ARACOIABA). APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2°, I E II. OPINO PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. ARQUIVAR A PASTA.
+
+
+Informações que devem estar no despacho a ser gerado:
+1. Identificação do Despacho
+2. Decisão sobre o Pleito
+3. Especificação do Leito e Prioridade
+4. Danos Morais: verificar se neste caso existe pedido de danos morais ou não.
+6. Aplicação de Normativas Específicas: verificar se neste caso existe aplicação de portaria ou não.
+7. Direcionamentos Finais
+
+Utilize uma linguagem formal e técnica adequada para um contexto jurídico, incorporando os elementos e o estilo dos exemplos dados para criar um novo despacho judicial simulado."""
+            ]
+        }
+    }
+}
+
+
+TEMPLATE_DECISAO_exame={
+    "header": "# Modelo para elaboração de despacho de decisão de fornecimento de exames médicos.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção. Exemplo: '1. Identificação do Tipo de Decisão' significa a primeira seção.",
+        "Cada número seguido de um ponto é uma subseção. Exemplo: '2.1 Objeto da Decisão' significa a primeira subseção da seção 2.",
+        "Implemente subsubseções se necessário."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": "Crie uma decisão judicial para a concessão de exames médicos, baseando-se nos dados fornecidos e nos exemplos abaixo, sem dividir em tópicos e em um único parágrafo. O texto deve ser formal e técnico, sem uso excessivo de maiúsculas.",
+            "elements": [
+                """Exemplos:
+1. COMARCA DE CANINDÉ. R.H. TRATA-SE DECISÃO INTERLOCUTÓRIA QUE ANTECIPOU OS EFEITOS DA TUTELA REQUERIDA. REALIZAÇÃO DOS EXAMES DE TC DO CRÂNIO, ELETROENCEFALOGRAMA, TGO, TGP, HEMOGRAMA COMPLETO, SUMÁRIO DE URINA, CREATININA, BILIRRUBINA TOTAL E FRAÇÕES, DOSAGENS DE LAMOTRIGINA E TOPIRAMATO, NC+, CE-, K+, CA++, MG++. LAUDO CONVENIADO. INEXISTÊNCIA DE REQUERIMENTO DE INDENIZAÇÃO POR DANOS MORAIS. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II, C/C ART. 2°, I E II. OPINO PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. AO PROCURADOR PARA RATIFICAÇÃO, APÓS ARQUIVAR A PASTA.
+
+2. TRATA-SE DECISÃO INTERLOCUTÓRIA QUE ANTECIPOU OS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO DO EXAME "RESSONÂNCIA DO ENCÉFALO". AUSÊNCIA DE PEDIDO DE CONDENAÇÃO EM DANOS MORAIS. LAUDO PÚBLICO (SECRETARIA MUNICIPAL DE QUIXADÁ/CE). APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II, C/C ART. 2°, I E II. OPINA-SE PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. À CHEFIA PARA RATIFICAÇÃO DA DISPENSA. APÓS, ARQUIVAR A PASTA, SMJ.
+
+3. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DE LEITO ESPECIALIZADO EM HOSPITAL PÚBLICO TERCIÁRIO COM EQUIPE CIRÚRGICA E REALIZAÇÃO DE EXAMES COMPLEMENTARES. AUSÊNCIA DE PEDIDO DE CONDENAÇÃO EM DANOS MORAIS. LAUDO PÚBLICO (UPA - CANINDEZINHO/CE). APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2º I E II. OPINA-SE PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. À CHEFIA PARA RATIFICAÇÃO DA DISPENSA. APÓS, ARQUIVAR A PASTA, SMJ.
+
+4. TRATA-SE DECISÃO INTERLOCUTÓRIA QUE ANTECIPOU OS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO DO EXAME (VIDEOENDOSCOPIA NASAL) . AUSÊNCIA DE PEDIDO DE DANOS MORAIS. LAUDO MÉDICO (DRA. MAILY G. RAMIA) APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II, C/C ART. 2°, I E II. OPINA-SE PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. À CHEFIA PARA RATIFICAÇÃO DA DISPENSA. APÓS, ARQUIVAR A PASTA, SMJ. 
+
+
+Informações que devem estar no despacho a ser gerado:
+1. Identificação do Despacho
+2. Decisão sobre o Pleito
+3. Especificação do Exame Médico
+4. Danos Morais: verificar se neste caso existe pedido de indenização por danos morais ou não.
+5. Aplicação de Normativas Específicas: verificar se neste caso existe aplicação de portaria ou não.
+6. Direcionamentos Finais
+
+Utilize uma linguagem formal e técnica adequada para um contexto jurídico, incorporando os elementos e o estilo dos exemplos dados para criar um novo despacho judicial simulado."""
+            ]
+        }
+    }
+}
+
+TEMPLATE_DECISAO_consulta={
+    "header": "# Modelo para elaboração de despacho de decisão de fornecimento de consultas médicas.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção. Exemplo: '1. Identificação do Tipo de Decisão' significa a primeira seção.",
+        "Cada número seguido de um ponto é uma subseção. Exemplo: '2.1 Objeto da Decisão' significa a primeira subseção da seção 2.",
+        "Implemente subsubseções se necessário."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": "Crie uma decisão judicial para a concessão de consultas médicas, baseando-se nos dados fornecidos e nos exemplos abaixo, sem dividir em tópicos e em um único parágrafo. O texto deve ser formal e técnico, sem uso excessivo de maiúsculas.",
+            "elements": [
+                """Exemplos:
+1. R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO DE CONSULTA MÉDICA COM NEUROLOGISTA. PROCEDIMENTO FORNECIDO PELO SUS. LAUDO PÚBLICO (HOSPITAL MUNICIPAL JOAQUIM MANOEL DE OLIVEIRA). AUSÊNCIA DE DANO MORAL. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2°, I E II. OPINO PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO.
+
+2. (COMARCA DO CRATO) R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL. FORNECIMENTO DE CONSULTA MÉDICA COM ENDÓCRINO PEDIATRA E OFTALMOLOGISTA. AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO (PREFEITURA MUNICIPAL DO CRATO). APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2°, I E II. OPINO PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO.
+
+3. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO DE CONSULTA COM MÉDICO ESPECIALISTA E, POR CONSEGUINTE, DE CIRURGIA (VITRECTOMIA POSTERIOR COM INFUSÃO DE PERFLUOCARBONO E ENDOLASER PARA RETIRADA DE ÓLEO DE SILICONE EM OLHO DIREITO DA PARTE AUTORA). AUSÊNCIA DE PEDIDO DE CONDENAÇÃO EM DANO MORAL. LAUDO PÚBLICO/CONVENIADO (UAPS MARCO AURÉLIO - FORTALEZA/CE). APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2°, I E II. OPINA-SE PELA NÃO  APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. À CHEFIA PARA RATIFICAÇÃO. APÓS, ARQUIVAR A PASTA, SMJ.
+
+4. R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO DE CONSULTA COM ONCOLOGISTA, COM A REALIZAÇÃO DE TRATAMENTO ADEQUADO, INCLUSIVE, QUIMIOTERAPIA E RADIOTERAPIA. AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2°, I E II. OPINO PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. À CHEFIA PARA RATIFICAÇÃO. APÓS, ARQUIVAR A PASTA.
+
+
+Informações que devem estar no despacho a ser gerado:
+1. Identificação do Despacho
+2. Decisão sobre o Pleito
+3. Especificação da Consulta Médica
+4. Danos Morais: verificar se neste caso existe pedido de indenização por danos morais ou não.
+5. Aplicação de Normativas Específicas: verificar se neste caso existe aplicação de portaria ou não.
+6. Direcionamentos Finais
+
+Utilize uma linguagem formal e técnica adequada para um contexto jurídico, incorporando os elementos e o estilo dos exemplos dados para criar um novo despacho judicial simulado."""
+            ]
+        }
+    }
+}
+
+
+TEMPLATE_DECISAO_cirugia={
+    "header": "# Modelo para elaboração de despacho de decisão de fornecimento de cirurgia.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção. Exemplo: '1. Identificação do Tipo de Decisão' significa a primeira seção.",
+        "Cada número seguido de um ponto é uma subseção. Exemplo: '2.1 Objeto da Decisão' significa a primeira subseção da seção 2.",
+        "Implemente subsubseções se necessário."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": "Crie uma decisão judicial para a concessão de cirurgi, baseando-se nos dados fornecidos e nos exemplos abaixo, sem dividir em tópicos e em um único parágrafo. O texto deve ser formal e técnico, sem uso excessivo de maiúsculas.",
+            "elements": [
+                """Exemplos:
+1. R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO DE CIRURGIA BARIÁTRICA. AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO E PACIENTE JÁ FOI INCLUÍDA NA LISTA DE ESPERA. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2°, I E II. OPINO PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. AO PROCURADOR PARA RATIFICAÇÃO, APÓS ARQUIVAR A PASTA
+
+2. R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO DE CIRURGIA DE FECHAMENTO DE COLOSTOMIA E RECUPERAÇÃO DO TRÂNSITO INTESTINAL. AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO (PREFEITURA MUNICIPAL DE GUARACIABA DO NORTE). APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2°, I E II. OPINO PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. 
+
+3. R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA QUE INDEFERIU A ANTECIPAÇÃO DA TUTELA RECURSAL EM AGRAVO DE INSTRUMENTO. REALIZAÇÃO DE CIRURGIA LAPARASCÓPICA PARA RESSECÇÃO DE FOCOS DE ENDOMETRIOSE. AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO. APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2°, I E II, OPINO PELA NÃO APRESENTAÇÃO DAS CONTRARRAZÕES AO AGRAVO. DE ACORDO COM PRECEDENTES RECENTES DESTA PGE, 3003071-11.2023.8.06.0001, FOI AUTORIZADO O ARQUIVAMENTO DIRETO DAS PASTAS PELA ASSESSORIA NOS PROCESSOS QUE TENHAM REFERIDO TEMA. ARQUIVAR A PASTA. 
+
+4. R.H. TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO DE CIRURGIA DE FACOEMULSIFICAÇÃO COM IMPLANTE INTRAOCULAR (SIGTAP:04.05.05.011-9). AUSÊNCIA DE DANO MORAL. LAUDO PÚBLICO (RELATÓRIO PARA JUDICIALIZAÇÃO). APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2°, I E II. OPINO PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO. À CHEFIA PARA RATIFICAÇÃO, APÓS ARQUIVAR A PASTA.
+
+
+Informações que devem estar no despacho a ser gerado:
+1. Identificação do Despacho
+2. Decisão sobre o Pleito
+3. Especificação da Consulta Médica
+4. Danos Morais: verificar se neste caso existe pedido de indenização por danos morais ou não.
+5. Aplicação de Normativas Específicas: verificar se neste caso existe aplicação de portaria ou não.
+6. Direcionamentos Finais
+
+Utilize uma linguagem formal e técnica adequada para um contexto jurídico, incorporando os elementos e o estilo dos exemplos dados para criar um novo despacho judicial simulado."""
+            ]
+        }
+    }
+}
+
+
+TEMPLATE_SENTENCA_COMPOSTO_ALIMENTAR= {
+    "header": "# Modelo para elaboração de despacho para concessão de composto alimentar.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção. Exemplo: '1. Identificação do Tipo de Decisão' significa a primeira seção.",
+        "Cada número seguido de um ponto é uma subseção. Exemplo: '2.1 Objeto da Decisão' significa a primeira subseção da seção 2.",
+        "Implemente subsubseções se necessário."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": "Crie um despacho judicial para a concessão de composto alimentar, baseando-se nos dados fornecidos e nos exemplos de decisões anteriores. O texto deve ser estruturado em um único parágrafo, sem todas as letras em maiúsculo.",
+            "elements": [
+                """Exemplos:
+1. R.H. Trata-se de sentença julgando procedente o pleito autoral, com resolução do mérito, ratificando a decisão antecipatória de tutela anteriormente concedida. Fornecimento de composto alimentar de comercialização autorizada no país. Ausência de apreciação do pedido de dano moral. Sem custas nem honorários. Laudo público. Aplicação da Portaria 01/2017, art. 1º, III. Opino pela não interposição do recurso em tese cabível. Oficiar a SESA para conhecimento de sentença e comprovar cumprimento diretamente nos autos. Após, à chefia para ratificação e arquivar a pasta.
+                
+2. R.H. Trata-se de sentença julgando procedente o pleito autoral, com resolução do mérito, ratificando a decisão antecipatória de tutela anteriormente concedida. Fornecimento de composto alimentar de comercialização autorizada no país. Ausência de dano moral. Sem custas nem honorários. Aplicação da Portaria 01/2017, art. 1º, III. Opino pela não interposição do recurso em tese cabível.
+
+3. R.H. Trata-se de sentença julgando procedente o pleito autoral, com resolução do mérito, ratificando a decisão antecipatória de tutela anteriormente concedida. Fornecimento de composto alimentar de comercialização autorizada no país. Ausência de dano moral. Sem custas nem honorários. Laudo público. Aplicação da Portaria 01/2017, art. 1º, III. Opino pela não interposição do recurso em tese cabível. Oficiar a SESA para conhecimento de sentença e comprovar cumprimento diretamente nos autos. Após, tendo em vista anterior ratificação, arquivar.
+
+4. R.H. Trata-se de sentença julgando procedente o pleito autoral, com resolução do mérito, ratificando a decisão antecipatória de tutela anteriormente concedida. Fornecimento de composto alimentar, materiais para administrar a dieta e insumos de atenção básica (fraldas descartáveis). Ausência de pedido de danos morais. Aplicação da Portaria 01/2017, art. 1º, III e V. Sem honorários. Opino pela não interposição do recurso em tese cabível. Arquivar a pasta.
+
+Informaçoes que devem estar no despacho a ser gerado:
+1. Identificação do Despacho: "Número do processo, natureza da ação, e contexto jurídico.",
+2. Decisão sobre o Pleito: "Conclusão favorável ou desfavorável ao autor, com base em provas e fundamentação legal.",
+3. Especificação do Composto Alimentar: "Nome, fabricante, e registros oficiais que comprovem a autorização para comercialização.",
+4. Danos Morais: "Indicação da existência ou ausência de pedidos de danos morais, com justificativa.",
+6. Aplicação de Normativas Específicas: "Normas, portarias, e leis aplicáveis ao caso concreto.",
+7. Direcionamentos Finais: "Instruções sobre ofícios a serem enviados, comprovações, e arquivamento."
+
+Utilize uma linguagem formal e técnica adequada para um contexto jurídico, incorporando os elementos e o estilo dos exemplos dados para criar um novo despacho judicial simulado."""
+            ]
+        }
+    }
+}
+
+
+TEMPLATE_DECISAO_COMPOSTO_ALIMENTAR= {
+    "header": "# Modelo para elaboração de despacho.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção. Exemplo: '1. Identificação do Tipo de Decisão' significa a primeira seção.",
+        "Cada número seguido de um ponto é uma subseção. Exemplo: '2.1 Objeto da Decisão' significa a primeira subseção da seção 2.",
+        "Implemente subsubseções se necessário."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": "Crie um despacho judicial para a concessão de composto alimentar, baseando-se nos dados fornecidos e nos seguintes exemplos fornecidos de decisões anteriores, o texto deve ser em um único parágrafo. O texto não pode vir com todas as letras em maiúsculo.",
+            "elements": [
+                """Exemplos:
+1. R.H. Trata-se de decisão interlocutória concedendo a antecipação dos efeitos da tutela jurisdicional para determinar o fornecimento de composto alimentar de comercialização autorizada no país. Ausência de dano moral. Laudo público (HUWC). Aplicação da Portaria 01/2017, art. 1º, III c/c art. 2º, I e II. Opino pela não apresentação/interposição de defesa/recurso.
+
+2. R.H. Trata-se de decisão interlocutória concedendo a antecipação dos efeitos da tutela jurisdicional para determinar o fornecimento de composto alimentar de comercialização autorizada no país, bem como materiais para administrá-lo, e os seguintes insumos: cadeira de rodas adaptada, óleo de girassol, pomada nistatina, sonda de aspiração, gazes e um aparelho aspirador-inalador. Ausência de dano moral. Laudo público (Santa Casa de Misericórdia de Fortaleza). Aplicação da Portaria 01/2017, art. 1º, III e V c/c art. 2º, I e II. Opino pela não apresentação/interposição de defesa/recurso. À chefia para ratificação, após arquivar a pasta.
+
+3. R.H. Trata-se de decisão interlocutória concedendo a antecipação dos efeitos da tutela jurisdicional para determinar o fornecimento de composto alimentar. Custo do tratamento anual é inferior a 60 salários mínimos. Ausência de dano moral. Laudo público (HIAS). Aplicação da Portaria 01/2017, art. 1º, III c/c art. 2º, I e II. De acordo com os precedentes recentes desta PGE (exemplo: 0202503-31.2022.8.06.0055), opino pela não apresentação/interposição de defesa/recurso. Conforme orientação da chefia, arquivar a pasta.
+
+4. R.H. Trata-se de decisão interlocutória concedendo a antecipação dos efeitos da tutela jurisdicional para determinar o fornecimento de composto alimentar de comercialização autorizada no país e materiais para administrá-lo, bem como os seguintes insumos: cama e colchão hospitalares, fraldas geriátricas descartáveis 'G'. Custo anual do tratamento não supera o teto de 60 salários mínimos. Ausência de dano moral. Laudo público (Prefeitura de Fortaleza). Conforme precedente desta setorial (0202503-31.2022.8.06.0055), foi concedida a dispensa de apresentação/interposição de defesa/recurso pelo gabinete nesses casos em que o custo do tratamento anual enquadra-se no teto dos Juizados da Fazenda Pública. Aplicação da Portaria 01/2017, art. 1º, III c/c art. 2º, I e II. Opino pela não apresentação/interposição de defesa/recurso. Conforme orientação da chefia, arquivar a pasta.
+
+
+Informaçoes que devem estar no despacho a ser gerado:
+1. Identificação do Despacho
+2. Decisão sobre o Pleito
+3. Especificação do Composto Alimentar e Insumos
+4. Danos Morais
+5. Aplicação de Normativas Específicas
+6. Direcionamentos Finais
+
+Utilize uma linguagem formal e técnica adequada para um contexto jurídico, incorporando os elementos e o estilo dos exemplos dados para criar um novo despacho judicial simulado."""
+            ]
+        }
+    }
+}
