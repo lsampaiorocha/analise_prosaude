@@ -649,16 +649,67 @@ TEMPLATE_DECISAO_INTERNACAO_Semportaria = {
            - Inicie com "R.H." ou diretamente com a frase "TRATA-SE DE DECISÃO INTERLOCUTÓRIA..."
         2. Decisão sobre o Pleito:
            - Mencione a concessão da antecipação dos efeitos da tutela e o objetivo da decisão.
-           - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DE LEITO DE UTI – PRIORIDADE I."
+           - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DE LEITO DE UTI."
         3. Detalhes do Caso:
-           - Informe o tipo de prioridade (I, II ou III), a ausência ou presença de pedido de condenação em danos morais e o local do laudo médico.
-           - Exemplo: "AUSÊNCIA DE PEDIDO DE CONDENAÇÃO EM DANOS MORAIS. LAUDO PÚBLICO (HOSPITAL DISTRITAL DR. EVANDRO AYRES DE MOURA/CE)."
+           - Informe o tipo de prioridade (I, II ou III), a ausência ou presença de pedido de condenação em danos morais.
+           - Exemplo: "AUSÊNCIA DE PEDIDO DE CONDENAÇÃO EM DANOS MORAIS."
         3. Direcionamentos Processuais:
            - Sugira medidas processuais como não interposição de defesa/recurso e destinação do processo.
            - Exemplo: "OPINA-SE PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO."
+        4. Aplicação de portaria:
+            -Não escrever nada acerca de aplicação da portaria.
         5. Direcionamentos Finais:
            - Determine ações de encerramento ou encaminhamento do processo.
-           - Exemplo: "À CHEFIA PARA RATIFICAÇÃO DA DISPENSA. APÓS, ARQUIVAR A PASTA, SMJ."
+           - Exemplo: ARQUIVAR A PASTA."
+
+        Orientações Gerais:
+        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
+        - Utilize uma linguagem formal e técnica adequada para um contexto jurídico.
+        """
+            ]
+        }
+    }
+}
+
+
+TEMPLATE_sentenca_INTERNACAO_semportaria = {
+    "header": "# Modelo para elaboração de despacho judicial para concessão de internação hospitalar.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Decisão' refere-se à primeira seção do despacho.",
+        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Decisão' indica a primeira subseção da seção 2.",
+        "Use subsubseções quando necessário para detalhar informações complementares.",
+        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": (
+                "Elabore um despacho judicial para concessão de internação hospitalar, "
+                "baseando-se nos dados fornecidos e em exemplos de decisões anteriores. "
+                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
+                "Evite o uso de todas as letras em maiúsculo."
+            ),
+            "elements": [
+                """
+        Estrutura do Despacho:
+        1. Identificação do Despacho:
+           Inicie com a abreviação "R.H." para indicar a abertura do despacho.
+        2. Sentença e Mérito:
+           - Avalie se há sentença do mérito e decisão procedente sobre o pleito autoral.
+           - Descrever a determinação da sentença.
+           - Não é necessário mencionar a questao de ratificar a decisao antecipatoria de tutela
+           - Exemplo: "TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO."
+        3. Determinação da Internação:
+           - Caso explicitado, informe o tipo de leito ou internação. 
+           - Não há necessidade de mencioanar medicamentos
+           - Exemplo: "DETERMINA A INTERNAÇÃO EM LEITO HOSPITALAR TERCIÁRIO."
+        4. Danos Morais:
+           - Indique se há ou não condenação em danos morais.
+           - Exemplo: "AUSÊNCIA DE CONDENAÇÃO EM DANOS MORAIS."
+        5. Custas e Honorários:
+           - Especifique a existência ou não de custas e honorários.
+           - Exemplo: "SEM CUSTAS NEM HONORÁRIOS."
+        6. Direcionamentos Finais:
+           - Apenas escrever: "ARQUIVAR A PASTA."
 
         Orientações Gerais:
         - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
@@ -714,6 +765,8 @@ TEMPLATE_DECISAO_INTERNACAO3 = {
         }
     }
 }
+
+
 
 
 TEMPLATE_SENTENCA_COMPOSTO_ALIMENTAR= {
