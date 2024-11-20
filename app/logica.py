@@ -759,7 +759,7 @@ def split_text(text, max_length):
     return chunks
 
 
-
+'''
 def get_specific_info(text, api_key):
 
     openai.api_key = api_key
@@ -782,7 +782,32 @@ def get_specific_info(text, api_key):
     except Exception as e:
         print(f"Error during API call: {e}")
         return ""
+'''
 
+
+def get_specific_info(text, api_key):
+    openai.api_key = api_key
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Você é um jurista especializado em decisões judiciais."},
+                {"role": "user", "content": f"Extraia as seguintes informações do texto judicial:\n\n\
+                1. Identificação do Despacho: Indicação de que se trata de uma sentença judicial.\n\
+                2. Sentença do mérito: identificar a sentença do mérito, ou seja se é com ou sem mérito.\n\
+                3. Decisão sobre o Pleito/Mérito: Indicação de que o pleito autoral foi julgado procedente e a decisão antecipatória de tutela foi ratificada.\n\
+                4. Detalhes da internação: especificar o tipo do Leito ou Tipo de Internação.\n\
+                5. Especificação do Medicamento: Se houver medicamento, especificar o nome do medicamento e detalhes, como a dosagem. Confirmação de que o medicamento está registrado na ANVISA.\n\
+                6. Danos Morais: Afirmativa sobre a ausência de danos morais.\n\
+                7. Direcionamentos Finais: Instruções sobre não interpor recurso se cabível. Orientações para comunicar a Secretaria de Estado da Saúde (SESA) ou outras entidades sobre a decisão. Direções sobre arquivamento do processo conforme orientação da chefia.\n\
+                \nTexto: {text}"}
+            ]
+        )
+        extracted_info = response.choices[0].message.content.strip()
+        return extracted_info
+    except Exception as e:
+        print(f"Error during API call: {e}")
+        return ""
 
 # processar todos os PDFs de uma pasta no Google Drive
 def process_pdfs_from_drive(file_path, api_key):
@@ -832,15 +857,29 @@ def selecionar_template(resultado_analise):
         print('Template Decisão - Medicamento')
     elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and resultado_analise['internacao'] is True:
         data = {
-        "template": TEMPLATE_sentenca_INTERNACAO
+        "template": TEMPLATE_sentenca_INTERNACAO3
         }
-        print('Template Sentença - Internação')
+        print('Template Sentença - Internação - Aplica')
+    elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is False and resultado_analise['internacao'] is True:
+        data = {
+        "template": TEMPLATE_DECISAO_INTERNACAO_Semportaria
+        }
+        print('Template Sentença - Internação - Não Aplica')
         
     elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and resultado_analise['internacao'] is True:
         data = {
-        "template": TEMPLATE_DECISAO_INTERNACAO
+        "template": TEMPLATE_DECISAO_INTERNACAO3
         }
-        print('Template Decisão - Internação')
+        print('Template Decisão - Internação - Aplica')
+    
+    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is False and resultado_analise['internacao'] is True :
+        data = {
+        "template": TETEMPLATE_DECISAO_INTERNACAO_Semportaria
+        }
+        print('Template Decisão - Internação - Não Aplica')    
+
+
+        print('Template Decisão - Internação - Aplica')
     elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and len(resultado_analise['lista_compostos']) > 0:
         data = {
         "template": TEMPLATE_SENTENCA_COMPOSTO_ALIMENTAR
