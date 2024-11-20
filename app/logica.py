@@ -862,7 +862,7 @@ def selecionar_template(resultado_analise):
         print('Template Sentença - Internação - Aplica')
     elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is False and resultado_analise['internacao'] is True:
         data = {
-        "template": TEMPLATE_DECISAO_INTERNACAO_Semportaria
+        "template": TEMPLATE_sentenca_INTERNACAO_semportaria
         }
         print('Template Sentença - Internação - Não Aplica')
         
@@ -874,7 +874,7 @@ def selecionar_template(resultado_analise):
     
     elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is False and resultado_analise['internacao'] is True :
         data = {
-        "template": TETEMPLATE_DECISAO_INTERNACAO_Semportaria
+        "template": TEMPLATE_DECISAO_INTERNACAO_Semportaria
         }
         print('Template Decisão - Internação - Não Aplica')    
 
