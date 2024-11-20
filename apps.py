@@ -3,7 +3,6 @@ from projai.constants import MODELS
 from projai.prompts import prompt_projeto_inovafit
 from aigents.constants import AGENTS
 
-
 def config_build(knowledge_area: str,
                  area: str,
                  subject: str,
