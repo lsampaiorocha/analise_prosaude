@@ -373,7 +373,7 @@ TEMPLATE_sentenca_INTERNACAO3 = {
            - Inclua que aqui se aplica a PORTARIA 01/2017, ART. 1º, artigo II. Sem justificar.
            - Exemplo: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II."
         7. Direcionamentos Finais:
-           - Apenas escrever: "ARQUIVAR A PASTA."
+           - Apenas escrever: "VERIFICAR A NECESSIDADE DE ENCAMINHAR OFÍCIO À SESA, E APÓS, ARQUIVAR A PASTA"
 
         Orientações Gerais:
         - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
@@ -640,11 +640,12 @@ TEMPLATE_DECISAO_INTERNACAO_Semportaria = {
                 "Elabore uma decisão interlocutória para concessão de internação hospitalar, "
                 "baseando-se nos dados fornecidos e nos exemplos de decisões anteriores. "
                 "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo."
+                "Evite o uso de todas as letras em maiúsculo. Não se deve mencionar o nome de nenhuma pessoa envolvida, ao longo do texto."
             ),
             "elements": [
                 """
         Estrutura da Decisão:
+        
         1. Identificação do Despacho:
            - Inicie com "R.H." ou diretamente com a frase "TRATA-SE DE DECISÃO INTERLOCUTÓRIA..."
         2. Decisão sobre o Pleito:
@@ -657,12 +658,14 @@ TEMPLATE_DECISAO_INTERNACAO_Semportaria = {
            - Sugira medidas processuais como não interposição de defesa/recurso e destinação do processo.
            - Exemplo: "OPINA-SE PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO."
         4. Aplicação de portaria:
-            -Não escrever nada acerca de aplicação da portaria.
+            -Escrever que aqui não se tem aplicação da portaria. Escrever portanto conforme exemplo.
+            - Exemplo: "Não se aplica a portaria 01/2017."
         5. Direcionamentos Finais:
            - Determine ações de encerramento ou encaminhamento do processo.
-           - Exemplo: ARQUIVAR A PASTA."
+           - Exemplo: Encaminhe-se para análise e elaboração de contestação e recurso."
 
         Orientações Gerais:
+        
         - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
         - Utilize uma linguagem formal e técnica adequada para um contexto jurídico.
         """
@@ -686,7 +689,7 @@ TEMPLATE_sentenca_INTERNACAO_semportaria = {
                 "Elabore um despacho judicial para concessão de internação hospitalar, "
                 "baseando-se nos dados fornecidos e em exemplos de decisões anteriores. "
                 "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo."
+                "Evite o uso de todas as letras em maiúsculo.Não se deve mencionar o nome de nenhuma pessoa envolvida, ao longo do texto."
             ),
             "elements": [
                 """
@@ -708,8 +711,12 @@ TEMPLATE_sentenca_INTERNACAO_semportaria = {
         5. Custas e Honorários:
            - Especifique a existência ou não de custas e honorários.
            - Exemplo: "SEM CUSTAS NEM HONORÁRIOS."
-        6. Direcionamentos Finais:
-           - Apenas escrever: "ARQUIVAR A PASTA."
+        6. Aplicação de portaria:
+            - Escrever que aqui não se tem aplicação da portaria. Escrever portanto conforme exemplo.
+            - Exemplo: "Não se aplica a portaria 01/2017."
+        7. Direcionamentos Finais:
+           - Apenas escrever: "Encaminhe-se para análise e elaboração de contestação e recurso."
+        
 
         Orientações Gerais:
         - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
@@ -743,10 +750,10 @@ TEMPLATE_DECISAO_INTERNACAO3 = {
            - Inicie com "R.H." ou diretamente com a frase "TRATA-SE DE DECISÃO INTERLOCUTÓRIA..."
         2. Decisão sobre o Pleito:
            - Mencione a concessão da antecipação dos efeitos da tutela e o objetivo da decisão.
-           - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DE LEITO DE UTI – PRIORIDADE I."
+           - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DE LEITO DE UTI."
         3. Detalhes do Caso:
            - Informe o tipo de prioridade (I, II ou III), a ausência ou presença de pedido de condenação em danos morais e o local do laudo médico.
-           - Exemplo: "AUSÊNCIA DE PEDIDO DE CONDENAÇÃO EM DANOS MORAIS. LAUDO PÚBLICO (HOSPITAL DISTRITAL DR. EVANDRO AYRES DE MOURA/CE)."
+           - Exemplo: "AUSÊNCIA DE PEDIDO DE CONDENAÇÃO EM DANOS MORAIS."
         4. Aplicação de Normativas Específicas:
            - Inclua referência a normativas ou portarias aplicáveis ao caso.
            - Exemplo: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2º I E II."
@@ -754,8 +761,7 @@ TEMPLATE_DECISAO_INTERNACAO3 = {
            - Sugira medidas processuais como não interposição de defesa/recurso e destinação do processo.
            - Exemplo: "OPINA-SE PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO."
         6. Direcionamentos Finais:
-           - Determine ações de encerramento ou encaminhamento do processo.
-           - Exemplo: "À CHEFIA PARA RATIFICAÇÃO DA DISPENSA. APÓS, ARQUIVAR A PASTA, SMJ."
+           - Apenas escrever: "VERIFICAR A NECESSIDADE DE ENCAMINHAR OFÍCIO À SESA, E APÓS, ARQUIVAR A PASTA"
 
         Orientações Gerais:
         - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
@@ -838,3 +844,8 @@ Utilize uma linguagem formal e técnica adequada para um contexto jurídico, inc
         }
     }
 }
+
+
+
+
+

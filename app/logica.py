@@ -843,6 +843,67 @@ def grava_despacho_bd(fk,despacho,session):
         })
     session.commit()
 
+
+
+def selecionar_template(resultado_analise):
+    tipo_documento = resultado_analise.get('tipo_documento')
+    aplicacao_incisos = any(resultado_analise.get('aplicacao_incisos', []))
+    internacao = resultado_analise.get('internacao', False)
+    consulta_exame_procedimento = resultado_analise.get('consulta', False)
+    lista_medicamentos = resultado_analise.get('lista_medicamentos', [])
+    lista_compostos = resultado_analise.get('lista_compostos', [])
+    
+    # Mapear templates para diferentes tipos de documentos
+    templates = {
+        'Sentença': {
+            'medicamento': TEMPLATE_sentenca_MEDICAMENTO,
+            'internacao_aplica': TEMPLATE_sentenca_INTERNACAO3,
+            'internacao_nao_aplica': TEMPLATE_sentenca_INTERNACAO_semportaria,
+            'composto_alimentar': TEMPLATE_SENTENCA_COMPOSTO_ALIMENTAR,
+            'consulta_exame_procedimento_aplica': TEMPLATE_sentenca_INTERNACAO3,
+            'consulta_exame_procedimento_nao_aplica': TEMPLATE_sentenca_INTERNACAO_semportaria,
+        },
+        'Decisão Interlocutória': {
+            'medicamento': TEMPLATE_DECISAO_MEDICAMENTO,
+            'internacao_aplica': TEMPLATE_DECISAO_INTERNACAO3,
+            'internacao_nao_aplica': TEMPLATE_DECISAO_INTERNACAO_Semportaria,
+            'composto_alimentar': TEMPLATE_DECISAO_COMPOSTO_ALIMENTAR,
+            'consulta_exame_procedimento_aplica': TEMPLATE_DECISAO_INTERNACAO3,
+            'consulta_exame_procedimento_nao_aplica': TEMPLATE_DECISAO_INTERNACAO_Semportaria,
+        }
+    }
+    
+    # Verificar o tipo de documento
+    if tipo_documento in templates:
+        # Medicamento
+        if len(lista_medicamentos) > 0:
+            return {"template": templates[tipo_documento]['medicamento']}
+        
+        # Internação
+        if internacao:
+            if aplicacao_incisos:
+                return {"template": templates[tipo_documento]['internacao_aplica']}
+            else:
+                return {"template": templates[tipo_documento]['internacao_nao_aplica']}
+        
+        # Composto Alimentar
+        if len(lista_compostos) > 0:
+            return {"template": templates[tipo_documento]['composto_alimentar']}
+        
+        # Consultas Exames ou Procedimentos
+        if consulta_exame_procedimento:
+            if aplicacao_incisos:
+                return {"template": templates[tipo_documento]['consulta_exame_procedimento_aplica']}
+            else:
+                return {"template": templates[tipo_documento]['consulta_exame_procedimento_nao_aplica']}
+        
+
+    
+    # Caso nenhum template seja encontrado
+    print('Sem Template')
+    return None
+
+"""
 def selecionar_template(resultado_analise):
     if resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and len(resultado_analise['lista_medicamentos']) > 0:       
         data = {
@@ -933,7 +994,7 @@ def selecionar_template(resultado_analise):
         print('Sem Template')
         
     return data
-
+"""
 
 def gerar_despacho(n_processo,session,resultado_analise):
 
@@ -964,7 +1025,7 @@ def gerar_despacho(n_processo,session,resultado_analise):
     ### Parte responsável pela análise do arquivo pdf 
 
     caminho_arquivo =  encontrar_arquivo(nome_arquivo)
-    if caminho_arquivo is False:
+    if not caminho_arquivo:
         return False
     api_key = "sk-proj-P2P5NFRtGPSiQpe4HY0LT3BlbkFJq4CE1TqvPigoZHOWoxMy"
 
@@ -1033,7 +1094,7 @@ def gerar_despacho(n_processo,session,resultado_analise):
 
     data = selecionar_template(resultado_analise)
 
-    if data is False:
+    if not data:
         return False
 
     with requests.Session() as client:
@@ -1054,6 +1115,8 @@ def gerar_despacho(n_processo,session,resultado_analise):
 
     despacho  = data['result']['sections'][0]['content'][0]['paragraph']
     grava_despacho_bd(nome_arquivo,despacho,session)
+    
+    return True
 
 
 """
