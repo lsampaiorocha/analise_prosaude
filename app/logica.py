@@ -24,6 +24,7 @@ import requests
 from urllib.parse import urlencode
 from templates import *
 from article import DocumentProcessor
+from dotenv import load_dotenv
 
 
 from datetime import datetime
@@ -795,11 +796,10 @@ def get_specific_info(text, api_key):
                 {"role": "user", "content": f"Extraia as seguintes informações do texto judicial:\n\n\
                 1. Identificação do Despacho: Indicação de que se trata de uma sentença judicial.\n\
                 2. Sentença do mérito: identificar a sentença do mérito, ou seja se é com ou sem mérito.\n\
-                3. Decisão sobre o Pleito/Mérito: Indicação de que o pleito autoral foi julgado procedente e a decisão antecipatória de tutela foi ratificada.\n\
-                4. Detalhes da internação: especificar o tipo do Leito ou Tipo de Internação.\n\
+                3. Decisão sobre o Pleito/Mérito: Indicação de se o pleito autoral foi julgado procedente e a decisão antecipatória de tutela foi ratificada.\n\
+                4. Detalhes da internação: Se houver internação, especificar o tipo do Leito ou Tipo de Internação.\n\
                 5. Especificação do Medicamento: Se houver medicamento, especificar o nome do medicamento e detalhes, como a dosagem. Confirmação de que o medicamento está registrado na ANVISA.\n\
-                6. Danos Morais: Afirmativa sobre a ausência de danos morais.\n\
-                7. Direcionamentos Finais: Instruções sobre não interpor recurso se cabível. Orientações para comunicar a Secretaria de Estado da Saúde (SESA) ou outras entidades sobre a decisão. Direções sobre arquivamento do processo conforme orientação da chefia.\n\
+                6. Especificação da Consulta, exame ou procedimento: Se houver consulta, exame ou procedimento, especificar os detalhes.\n\
                 \nTexto: {text}"}
             ]
         )
@@ -849,25 +849,27 @@ def selecionar_template(resultado_analise):
     tipo_documento = resultado_analise.get('tipo_documento')
     aplicacao_incisos = any(resultado_analise.get('aplicacao_incisos', []))
     internacao = resultado_analise.get('internacao', False)
-    consulta_exame_procedimento = resultado_analise.get('consulta', False)
+    consulta_exame_procedimento = resultado_analise.get('possui_consulta', False)
     lista_medicamentos = resultado_analise.get('lista_medicamentos', [])
     lista_compostos = resultado_analise.get('lista_compostos', [])
     
     # Mapear templates para diferentes tipos de documentos
     templates = {
         'Sentença': {
-            'medicamento': TEMPLATE_sentenca_MEDICAMENTO,
-            'internacao_aplica': TEMPLATE_sentenca_INTERNACAO3,
+            'medicamento': TEMPLATE_SENTENCA_MEDICAMENTO,
+            'internacao_aplica': TEMPLATE_SENTENCA_INTERNACAO,
             'internacao_nao_aplica': TEMPLATE_sentenca_INTERNACAO_semportaria,
-            'composto_alimentar': TEMPLATE_SENTENCA_COMPOSTO_ALIMENTAR,
-            'consulta_exame_procedimento_aplica': TEMPLATE_sentenca_INTERNACAO3,
-            'consulta_exame_procedimento_nao_aplica': TEMPLATE_sentenca_INTERNACAO_semportaria,
+            'composto_alimentar_aplica': TEMPLATE_SENTENCA_COMPOSTO_ALIMENTAR,
+            'composto_alimentar_nao_aplica': TEMPLATE_SENTENCA_COMPOSTO_ALIMENTAR,
+            'consulta_exame_procedimento_aplica': TEMPLATE_SENTENCA_UNIFICADA,
+            'consulta_exame_procedimento_nao_aplica': TEMPLATE_SENTENCA_UNIFICADA,
         },
         'Decisão Interlocutória': {
             'medicamento': TEMPLATE_DECISAO_MEDICAMENTO,
-            'internacao_aplica': TEMPLATE_DECISAO_INTERNACAO3,
+            'internacao_aplica': TEMPLATE_DECISAO_INTERNACAO,
             'internacao_nao_aplica': TEMPLATE_DECISAO_INTERNACAO_Semportaria,
-            'composto_alimentar': TEMPLATE_DECISAO_COMPOSTO_ALIMENTAR,
+            'composto_alimentar_aplica': TEMPLATE_DECISAO_COMPOSTO_ALIMENTAR,
+            'composto_alimentar_nao_aplica': TEMPLATE_DECISAO_COMPOSTO_ALIMENTAR,
             'consulta_exame_procedimento_aplica': TEMPLATE_DECISAO_INTERNACAO3,
             'consulta_exame_procedimento_nao_aplica': TEMPLATE_DECISAO_INTERNACAO_Semportaria,
         }
@@ -888,7 +890,10 @@ def selecionar_template(resultado_analise):
         
         # Composto Alimentar
         if len(lista_compostos) > 0:
-            return {"template": templates[tipo_documento]['composto_alimentar']}
+            if aplicacao_incisos:
+                return {"template": templates[tipo_documento]['composto_alimentar_aplica']}
+            else:
+                return {"template": templates[tipo_documento]['composto_alimentar_nao_aplica']}
         
         # Consultas Exames ou Procedimentos
         if consulta_exame_procedimento:
@@ -897,8 +902,6 @@ def selecionar_template(resultado_analise):
             else:
                 return {"template": templates[tipo_documento]['consulta_exame_procedimento_nao_aplica']}
         
-
-    
     # Caso nenhum template seja encontrado
     print('Sem Template')
     return None
@@ -1008,6 +1011,7 @@ def gerar_despacho(n_processo,session,resultado_analise):
 
     json_file_path = 'dl_extracted_data.json'
 
+    """
     # Estrutura de dados a ser salva
     dados_json = {
         "nome_arquivo": f"{nome_arquivo}.pdf",
@@ -1015,6 +1019,43 @@ def gerar_despacho(n_processo,session,resultado_analise):
         "possui_medicamento": resultado[2],
         "possui_condenacao_honorario": resultado[3]
     }
+    """
+    
+    # Estrutura de dados a ser salva
+    # Estrutura de dados a ser salva
+    """
+    dados_json = {
+        "Informações da análise do processo": {
+            "Nome do Arquivo": f"{nome_arquivo}.pdf",
+            "Foram detectados medicamentos no documento analisado": resultado[2],
+            "Foi detectada condenação por honorários": resultado[3],
+            "Foi verificado a aplicação da Portaria 01/2017": resultado[4]
+        }
+    }
+    
+    """
+
+    dados_json = {
+    "Informações da análise do processo": {
+        "Nome do Arquivo": f"{nome_arquivo}.pdf",
+        "Análise de medicamentos no documento": (
+            "Foram detectados medicamentos no documento analisado"
+            if resultado[2]
+            else "Não foram detectados medicamentos no documento analisado"
+        ),
+        "Condenação por honorários": (
+            "Houve condenação por honorários"
+            if resultado[3]
+            else "Não houve condenação por honorários"
+        ),
+        "Aplicação da Portaria 01/2017": (
+            "Foi verificada a aplicação da Portaria 01/2017"
+            if resultado[4]
+            else "Não foi verificada a aplicação da Portaria 01/2017"
+        )
+        }
+    }
+
 
     # Escrever as informações extraídas em um arquivo JSON
     with open(json_file_path, mode='w', encoding='utf-8') as file:
@@ -1027,7 +1068,15 @@ def gerar_despacho(n_processo,session,resultado_analise):
     caminho_arquivo =  encontrar_arquivo(nome_arquivo)
     if not caminho_arquivo:
         return False
-    api_key = "sk-proj-P2P5NFRtGPSiQpe4HY0LT3BlbkFJq4CE1TqvPigoZHOWoxMy"
+    
+    # Configuração da chave da API GPT 
+    env_path = os.path.join(base_directory, 'ambiente.env')
+    load_dotenv(env_path)  # Carrega as variáveis de ambiente de .env
+
+    #verifica se a chave do GPT foi encontrada
+    api_key = os.environ.get('OPENAI_API_KEY')
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY não está definida")
 
     pdf_extracted_data = process_pdfs_from_drive(caminho_arquivo, api_key)
 
@@ -1056,10 +1105,14 @@ def gerar_despacho(n_processo,session,resultado_analise):
     pdf_data_dict = {item['File Name']: item for item in pdf_extracted_data}
     # Mesclar os arquivos com base no nome do arquivo
     merged_data = []
-    file_name = output_dl.get("nome_arquivo")
+    #file_name = output_dl.get("Nome do Arquivo")
+    file_name = output_dl["Informações da análise do processo"]["Nome do Arquivo"]
     if file_name in pdf_data_dict:
         merged_entry = {**output_dl, **pdf_data_dict[file_name]}
         merged_data.append(merged_entry)
+
+
+
 
     # Salvar o arquivo mesclado
     with open('merged_output.json', 'w', encoding='utf-8') as output_file:

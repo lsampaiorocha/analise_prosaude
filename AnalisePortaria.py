@@ -149,20 +149,14 @@ def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True,
         if Verbose:    
             print(f"Número de páginas após pré-processamento: {len(filtered_pages)}\n")
             print(f"Tipo de Documento em Análise: {tipo_documento}\n")
-            #for page in filtered_pages:
-            #    print(f"Página {page.metadata['page']}")
-            #    print(f"Página {page.page_content}")
 
         # cria ids para as páginas, o que vai ser útil para gerenciar o banco de dados de vetores
         ids = [str(i) for i in range(1, len(filtered_pages) + 1)]
 
         #utiliza embeddings da OpenAI para o banco de vetores Chroma
         embeddings = OpenAIEmbeddings()
-        #docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 128})
-        docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024}) #essa opção "hnsw:M": 1024 é importante para não ter problemas
-        
-        #print("Passou do Chroma")
-        
+        docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024}) #a opção "hnsw:M": 1024 é importante para não ter problemas
+                
         #aplica o pipeline de análise apropriado ao tipo de documento
         resposta = AnalisePipeline(filtered_pages, docsearch, models, Verbose, MedRobot, TipoDocumento=tipo_documento, Resumo=Resumo, CustoResumo=custoresumo)
 
@@ -175,19 +169,6 @@ def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True,
         docsearch = None 
         ids = [] 
 
-        """
-        with open(__file__, 'r+') as f:
-            # Lê o conteúdo do arquivo
-            content = f.read()
-            
-            # Faça qualquer modificação no conteúdo (opcional)
-            # content = content.replace('antigo_texto', 'novo_texto')
-
-            # Volta para o início do arquivo e sobrescreve
-            f.seek(0)
-            f.write(content)
-            f.truncate()
-        """
 
         return resposta
     
