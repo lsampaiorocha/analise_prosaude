@@ -25,6 +25,8 @@ from werkzeug.utils import secure_filename
 
 
 
+
+
 class TipoDocumentoIndeterminadoException(Exception):
     pass
 
