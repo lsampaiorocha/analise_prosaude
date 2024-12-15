@@ -29,6 +29,7 @@ from dotenv import load_dotenv
 
 from datetime import datetime
 
+from AnaliseAutos7 import *
 
 DB_PARAMS = {
       'host': '192.168.2.64',
@@ -62,6 +63,8 @@ def importar_autos_alfresco(n_processo):
       session_alfresco.commit()
 
       download_url = f"{alfresco_url}/alfresco/api/-default-/public/alfresco/versions/1/nodes/{id_alfresco}/content"
+
+      path = None
       try:
           response = requests.get(download_url, auth=HTTPBasicAuth(username, password))
           if response.status_code == 200:
@@ -198,43 +201,7 @@ def identificar_primeira_pagina(pdf_document, id_andamento):
     return primeira_pagina
 
 
-"""
-#Função para obter a primeira página de um 
-def primeira_pagina(n_processo,id_andamento):
-    
-    path = importar_autos_alfresco(n_processo)
-    file_path,filename = separar_pelo_id(path,id_andamento)
-    
-    if file_path is None:
-        return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
-
-    pdf_document = fitz.open(file_path)
-    #pages_to_extract = []
-    page_num = 0
-    page = pdf_document.load_page(page_num)
-    new_pdf = fitz.open()
-    text_length = 0 
-    full_text = ""
-    new_pdf.insert_pdf(pdf_document, from_page=page_num, to_page=page_num)
-    output_path = "temp"  
-    filename = "primeira_pagina_temp.pdf"           
-    file_path = f"{output_path}/{filename}"
-
-    # Salva o novo PDF
-    new_pdf.save(file_path)
-    new_pdf.close()
-    pdf_document.close()
-    return file_path,filename
-
-    # Salva o novo PDF
-    new_pdf.save(file_path)
-    new_pdf.close()
-    pdf_document.close()
-    return file_path,filename
-"""
-
-
-def importar_processos(SelecaoAutomaticaDocumento=False):
+def importar_processos():
   
   """
   Lógica da Rota para importar os processos de intimações cujos autos já tenham sido baixados pelos
@@ -308,7 +275,7 @@ def importar_processos(SelecaoAutomaticaDocumento=False):
       session.commit()
       
       print(f'Capturando documentos: Processo de no. unico {row[1]} e id {row[0]}')
-      captura_ids_processo(row[1], id=None, SelecaoAutomaticaDocumento=SelecaoAutomaticaDocumento)
+      captura_ids_processo(row[1], id_dado=None, SelecaoAutomaticaDocumento=True)
       
       print(f'Inserido: Processo de no. unico {row[1]} e id {row[0]}')
     
@@ -321,6 +288,8 @@ def importar_processos(SelecaoAutomaticaDocumento=False):
   return jsonify(resultado1), 200
    
 def analisar_marcados():
+  
+
 
   """
   Lógica da Rota para analisar todos os processos da tabela tb_analiseportaria tais que:
@@ -351,19 +320,25 @@ def analisar_marcados():
 
   session = Session()
   # Pesquisa o processo em tb_analiseportaria
-  query = text('SELECT numerounico,marcado_analisar,id_documento_analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.analisado is not true and ta.marcado_analisar is true and ta.id_documento_analisado is not null')
+  #query = text('SELECT numerounico,marcado_analisar,id_documento_analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.analisado is not true and ta.marcado_analisar is true and ta.id_documento_analisado is not null')
+  
+  
+  query = text('SELECT numerounico,marcado_analisar,id_documento_analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.analisado is not true and ta.marcado_analisar is true')
   resultados = session.execute(query).fetchall()
   
   for resultado in resultados:
-      n_processo = resultado[0]     
+      n_processo = resultado[0]   
+      print(n_processo)  
       id_andamento = resultado[2]  
-      atualizar_status(n_processo,id_andamento,session,momento = 2) 
+      #atualizar_status(n_processo,id_andamento,session,momento = 2) 
+      #Depois retirar o id do andamento
       resposta = analisa(n_processo, id_andamento)
-      
+      print(id_andamento)
+
       if isinstance(resposta, dict):
           grava_resultado_BD(n_processo, id_andamento, resposta, session)
           gerar_despacho(n_processo,session,resposta)
-          atualizar_status(n_processo,id_andamento,session,momento = 3) 
+          #atualizar_status(n_processo,id_andamento,session,momento = 3) 
       else:
           #return jsonify(resposta), 400
           print(resposta)
@@ -410,19 +385,20 @@ def analisar_processo(numero_processo):
 
   session = Session()
   # Pesquisa o processo em tb_analiseportaria
-  query = text('SELECT numerounico,marcado_analisar,id_documento_analisado,analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso and ta.analisado is not true and ta.marcado_analisar is true and ta.id_documento_analisado is not null')
+  #query = text('SELECT numerounico,marcado_analisar,id_documento_analisado,analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso and ta.analisado is not true and ta.marcado_analisar is true and ta.id_documento_analisado is not null')
+  query = text('SELECT numerounico,marcado_analisar,id_documento_analisado,analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso and ta.analisado is not true and ta.marcado_analisar is true')
   #ta.analisado is not true
   resultado = session.execute(query, {"numeroprocesso":numero_processo}).fetchone()
   n_processo =  resultado[0]
   id_andamento = resultado[2]
-  atualizar_status(n_processo,id_andamento,session,momento = 2) 
+  #atualizar_status(n_processo,id_andamento,session,momento = 2) 
 
   resposta = analisa(n_processo, id_andamento)
   
   if isinstance(resposta, dict):
     grava_resultado_BD(n_processo, id_andamento, resposta, session)
     gerar_despacho(n_processo,session,resposta)
-    atualizar_status(n_processo,id_andamento,session,momento = 3) 
+    #atualizar_status(n_processo,id_andamento,session,momento = 3) 
   else:
     return resposta
   
@@ -435,12 +411,18 @@ def analisa(n_processo, id_andamento):
       Lógica que recebe número único do processo e id do documento e chama
       o robô de análise para gerar o dicionário com todas as informações
       """    
+
+
       #Função para baixar o pdf no alfresco a partir do numero do processo
+      
       path = importar_autos_alfresco(n_processo)
+
+      if path is None:
+        return jsonify({"error":"Processo não encontrado no Alfresco!"}), 400  
      
       if path is False:
         return jsonify({"error":"Processo não encontrado no Alfresco!"}), 400  
-      
+
       # Função para separar a peça dado o id do documento
       file_path,filename, primeira_pagina = separar_pelo_id(path,id_andamento)
       
@@ -605,25 +587,16 @@ def grava_resultado_BD(n_processo, id_andamento, resultado, session):
 
 
 
+
 # Captura os ids dos documentos e suas informações a partir de um processo (e o id, pois podem haver vários processos com o mesmo numerounico)
 # Preenche essas informações no banco de dados tabela tb_documentos
-def captura_ids_processo(n_processo, id=None, SelecaoAutomaticaDocumento=False):
-    
-    """
-    path = importar_autos_alfresco(n_processo)
-    #Função para capturar o id_analise portaria dado o número do processo
-    engine = create_engine(DATABASE_URL)
-    Session = sessionmaker(bind=engine)
+def captura_ids_processo(n_processo, id_dado=None, SelecaoAutomaticaDocumento = True):
 
-    metadata = MetaData()
-    session = Session()
-    # Pesquisa o id da análise no banco pelo número do processo
-    query = text('SELECT numerounico, id FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso')
-    resultado = session.execute(query, {"numeroprocesso":n_processo}).fetchone()
-    id_analiseportaria =  resultado[1]
-    """
     
     path = importar_autos_alfresco(n_processo)
+    if not path: 
+        print("processo não encontrado no Alfresco")
+        return False
     # Função para capturar o id_analiseportaria dado o número do processo
     engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
@@ -631,66 +604,33 @@ def captura_ids_processo(n_processo, id=None, SelecaoAutomaticaDocumento=False):
     metadata = MetaData()
     session = Session()
 
-    if SelecaoAutomaticaDocumento == True:
-        print('A Fazer')
 
-    # Se um ID for passado, usa-o diretamente; caso contrário, faz a consulta
-    if id is not None:
-        id_analiseportaria = id
+    #Devo modificar a extração dos autos para retornar o processo escolhido e também a tabela já processada, faça colocando duas funções diferentes
+    # Suba a função do Pdf plumber, o local dela é aqui
+    pages_to_check = extract_pages_to_check(path)
+    document_info = extract_document_info_from_pages(path, pages_to_check)
+
+
+    # Se um ID for passado, usa-o diretamente;
+    if id_dado is not None:
+        id_analiseportaria = id_dado
+    # Se não for passado um id e robô de análise de processos estiver desativado,
+    #  então faz a consulta
     else:
-        # Pesquisa o id da análise no banco pelo número do processo
-        query = text('SELECT numerounico, id FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso')
+        query = text('SELECT numerounico, id FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso and analisado is null')
         resultado = session.execute(query, {"numeroprocesso": n_processo}).fetchone()
+        id_analiseportaria=  resultado[1]
         if resultado:
             id_analiseportaria = resultado[1]
         else:
             # Se não houver resultado, encerra a função com uma indicação de falha
             session.close()
-            pdf_document.close()
+            #Comentei pq não fazia sentido estar aqui 
+            #pdf_document.close()
             if os.path.isfile(path):
                 os.remove(path)
             return False
-
-    # Captura os ids dos andamentos dentro de um processo
-    pdf_document = pdfplumber.open(path)
-    document_info = []
-
-    for page_num,page in enumerate(pdf_document.pages):
-        texto = page.extract_text()
-        
-        # Verifica se a página tem o padrão "Num. \d{8} - Pág. \d+"
-        if not re.search(r"Num\. \d{8} - Pág\. \d+", texto):
-            # Unir linhas quebradas
-            texto = re.sub(r"\n", " ", texto)
-            tables = page.extract_tables()
-
-            for T in tables:
-                for table in T:
-                    if(None in table):
-                        table.remove(None)
-                    if(type(table[0]) == str):
-                        if(table[0].isnumeric() == False):
-                            continue
-                    else:
-                        i=0
-                        while(type(table[i])!=str):
-                            i+=1
-                        tempid_doc = document_info[-1][0]
-                        tempdata_assinatura = document_info[-1][1]
-                        tempdocumento = document_info[-1][2]+table[i]
-                        temptipo = document_info[-1][3]
-                        document_info.pop()
-                        document_info.append((tempid_doc, tempdata_assinatura, tempdocumento, temptipo))
-                        continue
-                    try:
-                        id_doc = table[0]
-                        data_assinatura = table[1].replace('\n',' ')
-                        documento = table[2].replace('\n',' ')
-                        tipo = table[3]
-                        document_info.append((id_doc, data_assinatura, documento, tipo))
-                    except Exception as e:
-                        print(f"Erro ao processar {n_processo}: {e}")
-                        continue 
+    
     for dados in document_info:
         try:
             id_doc = dados[0]
@@ -710,8 +650,26 @@ def captura_ids_processo(n_processo, id=None, SelecaoAutomaticaDocumento=False):
             continue 
 
 
-    session.commit()            
-    pdf_document.close()
+    session.commit() 
+
+    # Subparte da função que faz a análise de autos, por questões de organização, nas próximas versões é bom ser 
+    # uma função a parte
+    if SelecaoAutomaticaDocumento == True:
+        interesses = ["Petição Inicial", "Decisão", "Sentença",'Interlocutória']
+        forca_peticao = 0
+        IdAndamentoPortaria = CheckIdOfInterest(path,document_info,interesses,forca_peticao)
+        insercao_idanaliseportaria = session.execute(text('''
+            UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
+            SET id_documento_analisado=:IdAndamentoPortaria
+                                            
+            WHERE id=:id_analiseportaria;
+        '''), {
+            'id_analiseportaria': id_analiseportaria,
+            'IdAndamentoPortaria': IdAndamentoPortaria
+            
+        })
+        session.commit()           
+    
     if os.path.isfile(path):
         os.remove(path) 
     return True
@@ -719,7 +677,7 @@ def captura_ids_processo(n_processo, id=None, SelecaoAutomaticaDocumento=False):
 def encontrar_arquivo(nome_arquivo):
     
     nome_arquivo_comp = f"{nome_arquivo}.pdf"
-    diretorio_arquivos = f'arquivos/'  
+    diretorio_arquivos = f'temp/'  
     for raiz, _, arquivos in os.walk(diretorio_arquivos):
         if nome_arquivo_comp in arquivos:
             caminho_completo = os.path.join(raiz, nome_arquivo_comp)
