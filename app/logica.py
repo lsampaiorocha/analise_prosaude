@@ -1,6 +1,9 @@
 from flask import request, jsonify
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, DateTime, DECIMAL, ForeignKey,text, schema
-from sqlalchemy.orm import sessionmaker 
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.sql import text
+ 
 from AnalisePortaria import *
 
 #Alfresco
@@ -12,24 +15,37 @@ import PyPDF2
 import re
 import os
 
+from datetime import datetime, timedelta
+
 import pdfplumber
 
 # Imports despacho João Claudio
 
-import openai
-import csv
 import json
 import pandas as pd
 import requests
 from urllib.parse import urlencode
 from templates import *
-from article import DocumentProcessor
 from dotenv import load_dotenv
+
+
+#Imports nova versao despacho
+
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from langchain_openai import OpenAI
+from langchain.schema.runnable import RunnableSequence
+
+
+#Callback para calcular os custos da OPENAI
+from langchain_community.callbacks import get_openai_callback
 
 
 from datetime import datetime
 
-from AnaliseAutos7 import *
+from AnaliseAutos import *
 
 DB_PARAMS = {
       'host': '192.168.2.64',
@@ -47,15 +63,549 @@ password = "aeH}ie0nar"
 parent_node_id = "bf4f65fc-ee14-46d7-afe1-7a680f01515d"  
 
 
+
+def importar_processos():
+  
+    """
+    Lógica da Rota para importar os processos de intimações cujos autos já tenham sido baixados pelos
+    robô de distribuição de processos (tabela tb_autosprocessos) para a tabela tb_analiseportaria
+    """ 
+
+    try:
+        # Criar engine e sessão
+        engine = create_engine(DATABASE_URL)
+        Session = sessionmaker(bind=engine)
+
+        # Metadados globais
+        metadata = MetaData()
+        # Registrar a tabela tb_autosprosaude no metadata
+        tb_autosprosaude = Table(
+            'tb_autosprosaude', metadata,
+            Column('id', Integer, primary_key=True),
+            schema='scm_robo_intimacao'
+        )
+        
+        session = Session()
+
+    except SQLAlchemyError as e:
+        print(f"Erro ao conectar ao banco de dados: {str(e)}")
+        return jsonify({"error": "Erro ao conectar ao banco de dados", "details": str(e)}), 500
+
+
+    #Marcador para ignorar linha
+    marca = 0
+
+
+    # Obter a data limite para os últimos 15 dias
+    data_limite = datetime.now() - timedelta(days=90)
+    data_limite_str = data_limite.strftime('%Y-%m-%d')  # Formato YYYY-MM-DD
+
+    
+    # Consulta inicial para buscar os processos
+    query = text('''
+        SELECT id, numerounico, caminho, base, dt_processado, setorrequisicao
+        FROM scm_robo_intimacao.tb_autosprocessos ta 
+        WHERE ta.processado = true 
+            AND Upper(ta.setorrequisicao) = :setor 
+            AND ta.base LIKE :base 
+            AND ta.avisonoportal = true
+            AND ta.dt_processado >= :data_limite
+    ''')
+    
+    resultados = session.execute(query, {"setor": "PROSAUDE", "base": "%PJE%", "data_limite": data_limite_str}).mappings().fetchall()
+
+    if not resultados:
+        print("Nenhum processo encontrado.")
+        return jsonify({"message": "Nenhum processo encontrado."}), 200
+
+    for row in resultados:
+        # Verificar se o processo já foi inserido na tabela tb_analiseportaria
+        checagem_query = text('''
+            SELECT fk_autosprosaude 
+            FROM scm_robo_intimacao.tb_analiseportaria ta 
+            WHERE ta.fk_autosprosaude = :fk_autosprosaude
+        ''')
+        checagem = session.execute(checagem_query, {"fk_autosprosaude": row["id"]}).fetchone()
+        
+        if checagem:
+            print(f"Ignorado: Processo de número único {row['numerounico']} e id {row['id']} já foi inserido.")
+            continue
+
+        # Buscar o último ID inserido na tabela tb_analiseportaria
+        ultimo_id_query = text('''
+            SELECT id 
+            FROM scm_robo_intimacao.tb_analiseportaria 
+            ORDER BY id DESC LIMIT 1
+        ''')
+        ultimo_id = session.execute(ultimo_id_query).scalar()
+        novo_id = (ultimo_id + 1) if ultimo_id else 500
+
+        # Preparar os dados para inserção
+        dados_insercao = {
+            "id": novo_id,
+            "fk_autosprosaude": row["id"],
+            "numerounico": row["numerounico"],
+            "caminho": row["caminho"],
+            "base": row["base"],
+            "dt_processado": row["dt_processado"]
+        }
+
+        # Inserir o novo processo na tabela tb_analiseportaria
+        insercao_query = text('''
+            INSERT INTO scm_robo_intimacao.tb_analiseportaria 
+            (id, fk_autosprosaude, numerounico, caminho, base, dt_processado) 
+            VALUES (:id, :fk_autosprosaude, :numerounico, :caminho, :base, :dt_processado)
+        ''')
+        session.execute(insercao_query, dados_insercao)
+        session.commit()
+
+        print(f"Analisando Documentos dos Autos: Processo de número único {row['numerounico']} e id {row['id']}.")
+
+        # Capturar documentos relacionados ao processo
+        c = captura_ids_processo(novo_id, row["id"], id_dado=None, SelecaoAutomaticaDocumento=True)
+        
+        if not c:
+            mensagem = f"Erro ao Analisar Documentos dos Autos: Processo de número único {row['numerounico']} e id {row['id']}."
+            # Atualizar o status do processo
+            atualizar_status(dados_insercao['id'], session=session, status=4)
+            print(mensagem)
+            continue
+        
+
+        mensagem = f"Recebido: Processo de número único {row['numerounico']} e id {row['id']}."
+        print(mensagem)
+        gravar_log(session, row['numerounico'], mensagem)
+
+        # Atualizar o status do processo
+        atualizar_status(dados_insercao['id'], session=session, status=1)
+
+    # Confirmar transações pendentes
+    session.commit()
+
+    print("Processamento concluído.")
+    return jsonify({"message": "Processos analisados com sucesso."}), 200
+   
+def analisar_marcados():
+
+    """
+    Lógica da Rota para analisar todos os processos da tabela tb_analiseportaria tais que:
+    - não tenham sido ainda analisados
+    - estejam marcados para análise 
+    - possuam o campo id_documento definido
+    """
+
+
+    # Criar engine e sessão
+    engine = create_engine(DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+
+    # Metadados globais
+    metadata = MetaData()
+    # Registrar a tabela tb_autosprosaude no metadata
+    tb_autosprosaude = Table(
+        'tb_autosprosaude', metadata,
+        Column('id', Integer, primary_key=True),
+        schema='scm_robo_intimacao'
+    )
+
+    tb_medicamentos = Table(
+    'tb_medicamentos', metadata,
+    Column('id', Integer, primary_key=True),
+    schema='scm_robo_intimacao'
+    )
+
+    session = Session()
+    # Pesquisa o processo em tb_analiseportaria
+    #query = text('SELECT numerounico,marcado_analisar,id_documento_analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.analisado is not true and ta.marcado_analisar is true and ta.id_documento_analisado is not null')
+
+
+    # Definir a consulta SQL para selecionar os registros desejados
+    query = text('''
+    SELECT
+        id,
+        fk_autosprosaude, 
+        numerounico, 
+        marcado_analisar, 
+        id_documento_analisado 
+    FROM scm_robo_intimacao.tb_analiseportaria ta
+    WHERE ta.analisado IS NOT TRUE 
+    AND ta.marcado_analisar IS TRUE
+    ''')
+
+    # Executar a consulta e buscar todos os resultados
+    #resultados = session.execute(query).fetchall()
+    resultados = session.execute(query).mappings().fetchall()
+  
+    # Iterar pelos resultados
+    for resultado in resultados:
+        n_processo = resultado["numerounico"]  # Usando o nome da coluna como chave
+        print(n_processo)
+        
+        id_andamento = resultado["id_documento_analisado"]  # Usando o nome da coluna como chave
+        atualizar_status(resultado["id"], session, status=2)
+        mensagem = f"Iniciando Análise do processo: Número único {resultado['numerounico']} e id {resultado['id']}"
+        gravar_log(session, resultado["numerounico"], mensagem)
+        
+        # Depois retirar o id do andamento
+        resposta = analisa(resultado["fk_autosprosaude"], id_andamento, session, n_processo)
+        print(id_andamento)
+
+        # Verificar se a resposta é um dicionário
+        if isinstance(resposta, dict):
+            # Verificar se o dicionário contém a chave "error", em caso de algum erro
+            if "error" in resposta:
+                atualizar_status(resultado["id"], session, status=5)
+                mensagem = f"Erro na Análise do Processo: Número único {n_processo} e id {resultado['id']} - {resposta['error']}"
+                print(mensagem)
+                gravar_log(session, n_processo, mensagem)
+            else: #sucesso
+                grava_resultado_BD(resultado["id"], id_andamento, resposta, session)
+                gerar_despacho(resultado["id"], session, resposta)
+                atualizar_status(resultado["id"], session, status=3)
+                mensagem = f"Sucesso na Análise do Processo: Número único {n_processo} e id {resultado['id']}"
+                print(mensagem)
+                gravar_log(session, n_processo, mensagem)
+        else:
+            # Caso a resposta não seja um dicionário, trate como erro inesperado
+            atualizar_status(resultado["id"], session, status=5)
+            erro = resposta.get_json() if hasattr(resposta, "get_json") else str(resposta)
+            mensagem = f"Erro inesperado na Análise do Processo: Número único {n_processo} e id {resultado['id']} - {erro}"
+            print(mensagem)
+            gravar_log(session, n_processo, mensagem)
+
+    # Retorna a resposta com o resultado do processamento
+    return jsonify({"message": "Processos analisados com sucesso."}), 200
+        
+  
+ 
+
+def analisa(id_autosprocessos, id_andamento, session, numero_unico):
+    """
+    Lógica que recebe número único do processo e id do documento e chama
+    o robô de análise para gerar o dicionário com todas as informações
+    """
+
+    # Função para baixar o pdf no alfresco a partir do número do processo
+    path = importar_autos_alfresco(id_autosprocessos)
+    
+    print("Comecou a analisar")
+
+    if not path:
+        print("Processo não encontrado no Alfresco!")
+        response = jsonify({"error": "Processo não encontrado no Alfresco!"})
+        response.status_code = 400
+        return response
+
+    # Função para separar a peça dado o id do documento
+    file_path, filename, primeira_pagina = separar_pelo_id(path, id_andamento)
+
+    if file_path is None:
+        print("Não foi encontrado um documento com o id especificado!")
+        response = jsonify({"error": "Não foi encontrado um documento com o id especificado!"})
+        response.status_code = 400
+        return response
+
+    # Verificar se o arquivo não está vazio
+    with open(file_path, 'rb') as file:
+        pdf_content = file.read()
+
+    if len(pdf_content) == 0:
+        print("O arquivo enviado está vazio!")
+        response = jsonify({"error": "O arquivo enviado está vazio!"})
+        response.status_code = 400
+        return response
+
+    pdf_filename = filename
+    file_path = os.path.join('temp', pdf_filename)
+
+    models = {
+        "honorarios": "gpt-4o",
+        "doutros": "gpt-4o",
+        "medicamentos": "gpt-4o",
+        "alimentares": "gpt-4o",
+        "internacao": "gpt-4o",
+        "resumo": "gpt-4o",
+        "geral": "gpt-4o"
+    }
+
+    try:
+        resposta = AnalisePortaria(file_path, models, pdf_filename, Verbose=False)
+    except Exception as e:
+        print(f"Erro ao processar: {str(e)}")
+        
+        #atualizar_status(resultado["id"], session, status=3)
+        mensagem = f"Erro na Análise do Processo: Número único {numero_unico} Id {id_autosprocessos} e id documento {id_andamento} - {str(e)}"
+        print(mensagem)
+        gravar_log(session, numero_unico, mensagem)
+        
+        response = jsonify({"error": f"Não foi possível analisar o processo {id_autosprocessos} - {str(e)}"})
+        response.status_code = 400
+        return response
+
+    # Verificar se a resposta não é um dicionário
+    if not isinstance(resposta, dict):
+        print("O retorno de AnalisePortaria não é um dicionário!")
+        response = jsonify({"error": "O retorno de AnalisePortaria não é um dicionário"})
+        response.status_code = 400
+        return response
+
+    # Adicionar informações à resposta
+    resposta['primeira_pagina'] = primeira_pagina + 1
+
+    return resposta
+
+
+
+def grava_resultado_BD(id, id_andamento, resultado, session):
+
+    # ATUALIZAÇÃO COM OS RESULTADOS DA ANÁLISE
+    textosql = text(f"""
+        UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria ta 
+        SET tipo_documento = :tipo_documento, 
+        analisado = :analisado, 
+        aplica_portaria = :aplica_portaria, 
+        possui_medicamentos = :possui_medicamentos, 
+        possui_internacao = :possui_internacao, 
+        possui_consultas_exames_procedimentos = :possui_consultas_exames_procedimentos, 
+        possui_insulina = :possui_insulina, 
+        possui_insumos = :possui_insumos, 
+        possui_multidisciplinar = :possui_multidisciplinar, 
+        possui_custeio = :possui_custeio, 
+        possui_compostos = :possui_compostos,
+        possui_outros = :possui_outros,
+        possui_outros_impeditivos = :possui_outros_impeditivos,
+        possui_condenacao_honorarios = :possui_condenacao_honorarios,  
+        possui_danos_morais = :possui_danos_morais, 
+        lista_outros = :lista_outros,
+        lista_outros_impeditivos = :lista_outros_impeditivos,
+        custo_analise = :custo_analise, 
+        input_tokens = :input_tokens,
+        completion_tokens = :completion_tokens,
+        resumo =:resumo, 
+        resumo_analise =:resumo_analise,
+        marcado_analisar =:marcado_analisar, 
+        dt_analisado =:dt_analisado,
+        pagina_analisada =:pagina_analisada, 
+        id_documento_analisado =:id_analisado,
+        houve_extincao = :houve_extincao, 
+        cumprimento_de_sentenca = :cumprimento_de_sentenca, 
+        bloqueio_de_recursos = :bloqueio_de_recursos,
+        monocratica = :monocratica
+        WHERE ta.id=:id
+    """)
+
+    session.execute(textosql, {
+        'id': id,
+        'tipo_documento': resultado['tipo_documento'] if 'tipo_documento' in resultado else None,
+        'analisado': True,
+        'aplica_portaria': any(resultado['aplicacao_incisos']),
+        'possui_medicamentos': len(resultado['lista_medicamentos']) > 0,
+        'possui_internacao': resultado['internacao'] if resultado['internacao'] is not None else False,
+        'possui_consultas_exames_procedimentos': resultado['possui_consulta'] if resultado['possui_consulta'] is not None else False,
+        'possui_insulina': len(resultado['lista_glicemico']) > 0,
+        'possui_insumos': len(resultado['lista_insumos']) > 0,
+        'possui_multidisciplinar': len(resultado['lista_tratamento']) > 0,
+        'possui_custeio': resultado['possui_custeio'] if resultado['possui_custeio'] is not None else False,
+        'possui_compostos': len(resultado['lista_compostos']) > 0,
+        'possui_outros': resultado['possui_outros'] if 'possui_outros' in resultado else None,
+        'possui_outros_impeditivos': resultado['possui_outros_proibidos'] if 'possui_outros_impeditivos' in resultado else None,
+        'possui_condenacao_honorarios': resultado['condenacao_honorarios'] if resultado['condenacao_honorarios'] is not None else False,
+        'possui_danos_morais': resultado['indenizacao'] if resultado['indenizacao'] is not None else False,
+        'respeita_valor_teto': resultado['respeita_valor_teto'] if resultado['respeita_valor_teto'] is not None else False,
+        'lista_outros': resultado['lista_outros'] if 'lista_outros' in resultado else None,
+        'lista_outros_impeditivos': resultado['lista_outros_proibidos'] if resultado['lista_outros_proibidos'] is not None else None,
+        'custo_analise': resultado['custollm'] if 'custollm' in resultado else None,
+        'input_tokens': resultado['tokensllm'][0],
+        'completion_tokens': resultado['tokensllm'][1] if 'tokensllm' in resultado else None,
+        'resumo': resultado['resumo'] if 'resumo' in resultado else None,
+        'resumo_analise': resultado['resumo_analise'] if 'resumo_analise' in resultado else None,
+        'marcado_analisar': True,
+        'dt_analisado': datetime.now(),
+        'pagina_analisada': resultado['primeira_pagina'] if 'primeira_pagina' in resultado else None,
+        'id_analisado': id_andamento, 
+        'houve_extincao': resultado['houve_extincao'] if 'houve_extincao' in resultado else None,
+        'cumprimento_de_sentenca': resultado['cumprimento_de_sentenca'] if 'cumprimento_de_sentenca' in resultado else None,
+        'bloqueio_de_recursos': resultado['bloqueio_de_recursos'] if 'bloqueio_de_recursos' in resultado else None,
+        'monocratica': resultado['monocratica'] if 'monocratica' in resultado else None
+    })
+
+    # INSERÇÃO NA TABELA DE MEDICAMENTOS
+    for medicamento in resultado['lista_medicamentos']:
+        #textosql1 = text("SELECT * from db_pge.scm_robo_intimacao.tb_analiseportaria ta WHERE ta.id_analiseportaria =:id")
+        #buscaidportaria = session.execute(textosql1, {'id': id}).fetchone()
+        #idportaria = buscaidportaria[0]
+        
+        buscaultimoid = session.execute(text("SELECT MAX(tm.id) from db_pge.scm_robo_intimacao.tb_medicamentos tm")).fetchone()
+        idmedicamento = (buscaultimoid[0] or 1) + 1
+
+        insercaoAM = session.execute(text("""
+            INSERT into db_pge.scm_robo_intimacao.tb_medicamentos 
+            (id, id_analiseportaria, nome_principio, nome_comercial, dosagem, possui_anvisa, registro_anvisa, fornecido_SUS, valor) 
+            values(:id, :id_analiseportaria, :nome_principio, :nome_comercial, :dosagem, :possui_anvisa, :registro_anvisa, :fornecido_SUS, :valor)
+        """), {
+            'id': idmedicamento,
+            'id_analiseportaria': id,
+            'nome_principio': medicamento['nome_principio'],
+            'nome_comercial': medicamento['nome_comercial'],
+            'dosagem': medicamento['dosagem'],
+            'possui_anvisa': medicamento['registro_anvisa'] is not None,
+            'registro_anvisa': medicamento['registro_anvisa'],
+            'fornecido_SUS': medicamento['oferta_SUS'] or False,
+            'valor': medicamento['preco_PMVG'].replace('R$', '')
+        })
+        
+    
+    # INSERÇÃO NA TABELA DE COMPOSTOS ALIMENTARES
+    for alimento in resultado['lista_compostos']:
+        #textosql1 = text("SELECT * from db_pge.scm_robo_intimacao.tb_analiseportaria ta WHERE ta.id_analiseportaria =:id")
+        #buscaidportaria = session.execute(textosql1, {'id': id}).fetchone()
+        #idportaria = buscaidportaria[0]
+
+        buscaultimoid = session.execute(text("SELECT MAX(tc.id) from db_pge.scm_robo_intimacao.tb_compostos tc")).fetchone()
+        idcomposto = (buscaultimoid[0] or 0) + 1  # Incrementa o ID, começando de 1 se vazio
+
+        insercaoAC = session.execute(text("""
+            INSERT into db_pge.scm_robo_intimacao.tb_compostos
+            (id, id_analiseportaria, nome_composto, qtde, duracao, possui_anvisa, registro_anvisa, valor)
+            values(:id, :id_analiseportaria, :nome_composto, :qtde, :duracao, :possui_anvisa, :registro_anvisa, :valor)
+        """), {
+            'id': idcomposto,
+            'id_analiseportaria': id,
+            'nome_composto': alimento['nome'],
+            'qtde': alimento['quantidade'],
+            'duracao': alimento['duracao'],
+            'possui_anvisa': alimento.get('possui_anvisa', None),
+            'registro_anvisa': alimento.get('registro_anvisa', None),
+            'valor': alimento.get('valor', None)
+        })
+    
+    
+    session.commit()
+
+
+
+
+# Captura os ids dos documentos e suas informações a partir de um processo (e o id, pois podem haver vários processos com o mesmo numerounico)
+# Preenche essas informações no banco de dados tabela tb_documentos
+def captura_ids_processo(id_analiseportaria, id_autosprocessos, id_dado=None, SelecaoAutomaticaDocumento=True):
+    path = importar_autos_alfresco(id_autosprocessos)
+    if not path:
+        print("Processo não encontrado no Alfresco")
+        return False
+
+    # Configuração do banco de dados
+    engine = create_engine(DATABASE_URL)
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    # Extração das páginas e informações do documento
+    pages_to_check = extract_pages_to_check(path)
+    document_info = extract_document_info_from_pages(path, pages_to_check)
+
+    # Usa ID fornecido ou consulta o banco
+    if id_dado is not None:
+        id_analiseportaria = id_dado
+    else:
+        query = text('''
+            SELECT numerounico, id 
+            FROM scm_robo_intimacao.tb_analiseportaria ta 
+            WHERE ta.id = :id_analiseportaria 
+              AND analisado IS NULL
+        ''')
+        resultado = session.execute(query, {"id_analiseportaria": id_analiseportaria}).mappings().first()
+
+        num_unico = resultado["numerounico"]
+
+        if resultado:
+            id_analiseportaria = resultado["id"]
+        else:
+            session.close()
+            if os.path.isfile(path):
+                os.remove(path)
+            return False
+
+    for dados in document_info:
+        try:
+            # Desestruturar informações do documento
+            id_doc = dados["id_doc"]
+            data_assinatura = dados["dt_assinatura"].replace('\n', ' ')
+            documento = dados["nome"].replace('\n', ' ')
+            tipo = dados["tipo"]
+
+            # Obter o maior ID atual da tabela
+            res = session.execute(
+                text('SELECT MAX(id) AS valor_max FROM db_pge.scm_robo_intimacao.tb_documentosautos')
+            ).mappings().first()
+            max_id = (res["valor_max"] or 0) + 1
+
+            # Verificar se o documento já existe
+            query_check = text('''
+                SELECT numerounico, id_documento 
+                FROM db_pge.scm_robo_intimacao.tb_documentosautos 
+                WHERE id_analiseportaria = :id_analiseportaria 
+                  AND id_documento = :iddocumento
+            ''')
+            check = session.execute(query_check, {
+                "id_analiseportaria": id_analiseportaria,
+                "iddocumento": id_doc
+            }).mappings().first()
+
+            if not check:
+                # Inserir novo documento
+                session.execute(text('''
+                    INSERT INTO db_pge.scm_robo_intimacao.tb_documentosautos 
+                    (id, numerounico, id_documento, dt_assinatura, nome, tipo, id_analiseportaria) 
+                    VALUES (:id, :numerounico, :id_documento, :dt_assinatura, :nome, :tipo, :id_analiseportaria)
+                '''), {
+                    'id': max_id,
+                    'numerounico': num_unico,
+                    'id_documento': id_doc,
+                    'dt_assinatura': data_assinatura,
+                    'nome': documento,
+                    'tipo': tipo,
+                    'id_analiseportaria': id_analiseportaria
+                })
+        except Exception as e:
+            print(f"Erro ao processar {id_analiseportaria}: {e}")
+            continue
+
+    session.commit()
+
+    # Seleção automática do documento a ser analisado
+    if SelecaoAutomaticaDocumento:
+        interesses = ["Petição Inicial", "Decisão", "Sentença", "Interlocutória"]
+        forca_peticao = 0
+        IdAndamentoPortaria = CheckIdOfInterest(path, document_info, interesses, forca_peticao)
+
+        if IdAndamentoPortaria is not None:
+            session.execute(text('''
+                UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
+                SET id_documento_analisado = :IdAndamentoPortaria,
+                    marcado_analisar = TRUE
+                WHERE id = :id_analiseportaria
+            '''), {
+                'id_analiseportaria': id_analiseportaria,
+                'IdAndamentoPortaria': IdAndamentoPortaria
+            })
+            session.commit()
+        else:
+            print(f"Erro ao fazer a seleção automática para {id_analiseportaria}")
+            
+    if os.path.isfile(path):
+        os.remove(path)
+
+    return True
+
+
 #Função para baixar o pdf no alfresco a partir do numero do processo
-def importar_autos_alfresco(n_processo):  
+def importar_autos_alfresco(id_autosprocessos):  
       engine_alfresco = create_engine(DATABASE_URL)
       Session_alfresco = sessionmaker(bind=engine_alfresco)  
       metadata_alfresco = MetaData()
       
       session_alfresco = Session_alfresco()
-      query = text('SELECT numerounico, idalfresco,id FROM scm_robo_intimacao.tb_autosprocessos WHERE numerounico = :numero_processo')
-      resultado_alfresco = session_alfresco.execute(query, {"numero_processo": n_processo}).fetchone()
+      query = text('SELECT numerounico, idalfresco,id FROM scm_robo_intimacao.tb_autosprocessos WHERE id = :id')
+      resultado_alfresco = session_alfresco.execute(query, {"id": id_autosprocessos}).fetchone()
 
       id_alfresco =  resultado_alfresco[1]
       id_processo = resultado_alfresco[2]
@@ -87,7 +637,7 @@ def importar_autos_alfresco(n_processo):
           return False
       return path       
 
-#Função que irá separar o documento a ser analisado pela portaria do restante dos autos 
+#Função que irá separar o documento de id (parametro) a ser analisado pela portaria do restante dos autos 
 def separar_pelo_id(path,id_andamento): 
     pdf_document = fitz.open(path)
     
@@ -131,54 +681,72 @@ def separar_pelo_id(path,id_andamento):
 
 
 
-def atualizar_status(n_processo, id_andamento,session,momento): 
 
-    if momento == 1: 
-        status = 'Recebido'
-        insercaoAM = session.execute(text('''
-            UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
-            SET status=:status
-                                            
-            WHERE numerounico=:n_processo;
-        '''),
-        {
-            'status': status,
-            'n_processo': n_processo
-            
-        })
-        session.commit()
-        
-    elif momento == 2:
-        status = 'Em Análise'
-        insercaoAM = session.execute(text('''
-            UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
-            SET status=:status
-                                            
-            WHERE numerounico=:n_processo AND id_documento_analisado=:id_andamento;
-        '''),
-        {
-            'status': status,
-            'id_andamento': id_andamento,
-            'n_processo': n_processo
-            
-        })
-        session.commit()
-    elif momento == 3:
-        status = 'Analisado'
-        insercaoAM = session.execute(text('''
-            UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
-            SET status=:status
-                                            
-            WHERE numerounico=:n_processo AND id_documento_analisado=:id_andamento;
-        '''),
-        {
-            'status': status,
-            'id_andamento': id_andamento,
-            'n_processo': n_processo
-            
-        })
-    else: 
-        print('Não foi possível fazer a atualização do status') 
+
+
+#grava uma mensagem no log do banco de dados
+def gravar_log(session, numerounico, mensagem):
+    """
+    Grava um log na tabela scm_robo_intimacao.tb_log_extracao_robo.
+
+    :param session: Sessão do banco de dados.
+    :param numerounico: Identificador único do processo.
+    :param mensagem: Mensagem a ser gravada no log.
+    """
+    
+    # Define os valores fixos e o timestamp atual
+    base = 'PPRS'
+    data_execucao = datetime.now()
+
+    query = '''
+        INSERT INTO scm_robo_intimacao.tb_log_extracao_robo (log, data_execucao, base, numerounico)
+        VALUES (:log, :data_execucao, :base, :numerounico)
+    '''
+    params = {
+        'log': mensagem,
+        'data_execucao': data_execucao,
+        'base': base,
+        'numerounico': numerounico
+    }
+
+    # Executa a consulta e faz o commit
+    session.execute(text(query), params)
+    session.commit()
+
+
+#atualiza o status de um processo
+def atualizar_status(id, session, status):
+    """
+    Atualiza o status de um processo em tb_analiseportaria 
+
+    :param id: id do processo.
+    :param session: Sessão do banco de dados.
+    :param status: Código do status.
+    """
+    status_map = {
+        1: 'Recebido',
+        2: 'Em Análise',
+        3: 'Analisado',
+        4: 'Erro no Recebimento',
+        5: 'Erro na Análise'
+    }
+
+    status = status_map.get(status)
+
+    if not status:
+        print('Não foi possível fazer a atualização do status: Código inválido.')
+        return
+
+    query = '''
+        UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
+        SET status = :status
+        WHERE id = :id
+    '''
+    params = {'status': status, 'id': id}
+
+    # Executa a consulta e faz o commit
+    session.execute(text(query), params)
+    session.commit()
 
 # Função que irá identificar a primeira página do documento a ser analisado pela portaria
 def identificar_primeira_pagina(pdf_document, id_andamento):
@@ -201,604 +769,84 @@ def identificar_primeira_pagina(pdf_document, id_andamento):
     return primeira_pagina
 
 
-def importar_processos():
-  
-  """
-  Lógica da Rota para importar os processos de intimações cujos autos já tenham sido baixados pelos
-  robô de distribuição de processos (tabela tb_autosprocessos) para a tabela tb_analiseportaria
-  """ 
-  
-  # Criar engine e sessão
-  engine = create_engine(DATABASE_URL)
-  Session = sessionmaker(bind=engine)
-  
-  # Metadados globais
-  metadata = MetaData()
-  # Registrar a tabela tb_autosprosaude no metadata
-  tb_autosprosaude = Table(
-      'tb_autosprosaude', metadata,
-      Column('id', Integer, primary_key=True),
-      schema='scm_robo_intimacao'
-  )
-      
-  
-  #Marcador para ignorar linha
-  marca = 0
-
-  session = Session()
-  # Abre a tabela tb_autosprosaude com intimações que foram processadas
-  query = text('SELECT * FROM scm_robo_intimacao.tb_autosprocessos ta WHERE ta.processado = true AND Upper(setorrequisicao) = :setor AND ta.base LIKE :base')
-  resultado = session.execute(query, {"setor":"PROSAUDE","base":"%PJE%"})
-  
-  resultado1 = (None,None,None,None,None,None) 
-  for row in resultado:    
-      #Verifica se a linha já foi inserida antes
-      checagem1 = session.execute(text(f'SELECT * FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.fk_autosprosaude = {row[0]}'))
-      for check in checagem1:
-          if(check[1] == row[0]):
-              print(f'Ignorado: Processo de no. unico {row[1]} e id {row[0]} já foi inserido')
-              marca = 1
-              break    
-      if(marca == 1):
-          marca = 0
-          continue 
-
-      #Verifica se a tabela está vazia e busca o último id inserido
-      buscaultimoid = session.execute(text('SELECT * FROM scm_robo_intimacao.tb_analiseportaria ta ORDER by ta.id DESC')).first()
-      if(buscaultimoid == None):
-          temppk = 500
-
-      else:
-          temppk = buscaultimoid[0] + 1 
-
-      print(f'Inserindo: Processo de no. unico {row[1]} e id {row[0]}')
-    
-      #fk_autosprosaude
-      tempfk = row[0]
-      
-      #numerounico
-      tempNU = row[1]
-      
-      #caminho
-      tempCA = row[4]
-      
-      #base
-      tempbase = row[5]
-      
-      #dt_processado
-      tempdtproc = row[8]
-      
-      resultado1 =(temppk,tempfk,tempNU,tempCA,tempbase,tempdtproc)
-  
-      insercao = session.execute(text('INSERT into scm_robo_intimacao.tb_analiseportaria (id, fk_autosprosaude, numerounico, caminho, base, dt_processado) values(:id,:fk_autosprosaude,:numerounico,:caminho,:base,:dt_processado)'),{'id':f'{temppk}','fk_autosprosaude':f'{tempfk}','numerounico':f'{tempNU}','caminho':f'{tempCA}','base':f'{tempbase}','dt_processado':f'{tempdtproc}'})
-      
-      session.commit()
-      
-      print(f'Capturando documentos: Processo de no. unico {row[1]} e id {row[0]}')
-      captura_ids_processo(row[1], id_dado=None, SelecaoAutomaticaDocumento=True)
-      
-      print(f'Inserido: Processo de no. unico {row[1]} e id {row[0]}')
-    
-      atualizar_status(n_processo = tempNU,id_andamento = None,momento = 1,session= session) 
-      
-      ############    
-
-  session.commit()
-
-  return jsonify(resultado1), 200
-   
-def analisar_marcados():
-  
-
-
-  """
-  Lógica da Rota para analisar todos os processos da tabela tb_analiseportaria tais que:
-    - não tenham sido ainda analisados
-    - estejam marcados para análise 
-    - possuam o campo id_documento definido
-  """
-
-
-  # Criar engine e sessão
-  engine = create_engine(DATABASE_URL)
-  Session = sessionmaker(bind=engine)
-  
-  # Metadados globais
-  metadata = MetaData()
-  # Registrar a tabela tb_autosprosaude no metadata
-  tb_autosprosaude = Table(
-      'tb_autosprosaude', metadata,
-      Column('id', Integer, primary_key=True),
-      schema='scm_robo_intimacao'
-  )
-  
-  tb_medicamentos = Table(
-    'tb_medicamentos', metadata,
-    Column('id', Integer, primary_key=True),
-    schema='scm_robo_intimacao'
-  )
-
-  session = Session()
-  # Pesquisa o processo em tb_analiseportaria
-  #query = text('SELECT numerounico,marcado_analisar,id_documento_analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.analisado is not true and ta.marcado_analisar is true and ta.id_documento_analisado is not null')
-  
-  
-  query = text('SELECT numerounico,marcado_analisar,id_documento_analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.analisado is not true and ta.marcado_analisar is true')
-  resultados = session.execute(query).fetchall()
-  
-  for resultado in resultados:
-      n_processo = resultado[0]   
-      print(n_processo)  
-      id_andamento = resultado[2]  
-      #atualizar_status(n_processo,id_andamento,session,momento = 2) 
-      #Depois retirar o id do andamento
-      resposta = analisa(n_processo, id_andamento)
-      print(id_andamento)
-
-      if isinstance(resposta, dict):
-          grava_resultado_BD(n_processo, id_andamento, resposta, session)
-          gerar_despacho(n_processo,session,resposta)
-          #atualizar_status(n_processo,id_andamento,session,momento = 3) 
-      else:
-          #return jsonify(resposta), 400
-          print(resposta)
-  
-  # Retorna a resposta com o resultado do processamento
-  return jsonify({"message": "Processos analisados com sucesso."}), 200
-      
-  
-      
-def analisar_processo(numero_processo):
-  """
-  Lógica da Rota de análise de aplicação de portaria para um processo.
-  A rota recebe um número de processo como parâmetro e executa diversas etapas necessárias para
-  análise, desde a recuperação dos autos no Alfresco, até a extração do documento a ser analisado
-  e aplicação do pipeline de análise de aplicação de portaria
-  
-  Parâmetros:
-  - numero_processo (form): Número do processo a ser analisado.
-  
-  Fluxo:
-  1. Validação do número de processo e mesmo foi marcado para análise.
-  2. Download dos autos completos do processo (Alfresco).
-  3. Processamento dos autos para extrair o documento a ser analisado
-  4. Execução do pipeline de Análise.
-  5. Escrita dos resultados da análise no BD.
-  """    
-  
-  numero_processo = request.form.get('numero_processo')
-  #TODO: Verificar casos em que o número não tenha sido passado no formato padrão
-  
-
-  # Criar engine e sessão
-  engine = create_engine(DATABASE_URL)
-  Session = sessionmaker(bind=engine)
-  
-  # Metadados globais
-  metadata = MetaData()
-  # Registrar a tabela tb_autosprosaude no metadata
-  tb_autosprosaude = Table(
-      'tb_autosprosaude', metadata,
-      Column('id', Integer, primary_key=True),
-      schema='scm_robo_intimacao'
-  )
-
-  session = Session()
-  # Pesquisa o processo em tb_analiseportaria
-  #query = text('SELECT numerounico,marcado_analisar,id_documento_analisado,analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso and ta.analisado is not true and ta.marcado_analisar is true and ta.id_documento_analisado is not null')
-  query = text('SELECT numerounico,marcado_analisar,id_documento_analisado,analisado FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso and ta.analisado is not true and ta.marcado_analisar is true')
-  #ta.analisado is not true
-  resultado = session.execute(query, {"numeroprocesso":numero_processo}).fetchone()
-  n_processo =  resultado[0]
-  id_andamento = resultado[2]
-  #atualizar_status(n_processo,id_andamento,session,momento = 2) 
-
-  resposta = analisa(n_processo, id_andamento)
-  
-  if isinstance(resposta, dict):
-    grava_resultado_BD(n_processo, id_andamento, resposta, session)
-    gerar_despacho(n_processo,session,resposta)
-    #atualizar_status(n_processo,id_andamento,session,momento = 3) 
-  else:
-    return resposta
-  
-  # Retorna a resposta com o resultado do processamento
-  return jsonify({"message": "Processo atualizado com sucesso."}), 200
-
-
-def analisa(n_processo, id_andamento):
-      """
-      Lógica que recebe número único do processo e id do documento e chama
-      o robô de análise para gerar o dicionário com todas as informações
-      """    
-
-
-      #Função para baixar o pdf no alfresco a partir do numero do processo
-      
-      path = importar_autos_alfresco(n_processo)
-
-      if path is None:
-        return jsonify({"error":"Processo não encontrado no Alfresco!"}), 400  
-     
-      if path is False:
-        return jsonify({"error":"Processo não encontrado no Alfresco!"}), 400  
-
-      # Função para separar a peça dado o id do documento
-      file_path,filename, primeira_pagina = separar_pelo_id(path,id_andamento)
-      
-      if file_path is None:
-        return jsonify({"error": "Não foi encontrado um documento com o id especificado!"}), 400
-      
-      #pdf_file = fitz.open(file_path)
-
-      with open(file_path, 'rb') as file:
-        pdf_content = file.read()
-
-      if len(pdf_content) == 0:
-        return jsonify({"error": "O arquivo enviado está vazio!"}), 400
-        
-
-      pdf_filename = filename
-      file_path = os.path.join('temp', pdf_filename)      
-      
-      models = {
-      "honorarios" : "gpt-4o",
-      "doutros" : "gpt-4o",
-      "medicamentos" : "gpt-4o",
-      "alimentares" : "gpt-4o",
-      "internacao" : "gpt-4o",      
-      "resumo" : "gpt-4o",
-      "geral" : "gpt-4o"
-      }
-
-      try:
-        
-        resposta = AnalisePortaria(file_path, models, pdf_filename, Verbose=True) 
-      
-      except Exception as e:
-        return jsonify({"error":f"Não foi possível analisar o processo{n_processo}"}), 400
-      
-      
-      if not isinstance(resposta, dict):
-        return jsonify({"error":"O retorno de AnalisePortaria não é um dicionário"}), 400
-
-      
-      #
-      resposta['primeira_pagina'] = primeira_pagina + 1
-      
-      #if os.path.isfile(path):
-      #    os.remove(path) 
-      
-      return resposta
-
-
-
-def grava_resultado_BD(n_processo, id_andamento, resultado, session):
-
-    # ATUALIZAÇÃO COM OS RESULTADOS DA ANÁLISE
-    textosql = text(f"""
-        UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria ta 
-        SET tipo_documento = :tipo_documento, 
-        analisado = :analisado, 
-        aplica_portaria = :aplica_portaria, 
-        possui_medicamentos = :possui_medicamentos, 
-        possui_internacao = :possui_internacao, 
-        possui_consultas_exames_procedimentos = :possui_consultas_exames_procedimentos, 
-        possui_insulina = :possui_insulina, 
-        possui_insumos = :possui_insumos, 
-        possui_multidisciplinar = :possui_multidisciplinar, 
-        possui_custeio = :possui_custeio, 
-        possui_compostos = :possui_compostos, 
-        possui_condenacao_honorarios = :possui_condenacao_honorarios,  
-        possui_danos_morais = :possui_danos_morais, 
-        lista_outros = :lista_outros, 
-        custo_analise = :custo_analise, 
-        input_tokens = :input_tokens,
-        completion_tokens = :completion_tokens,
-        resumo =:resumo, 
-        resumo_analise =:resumo_analise,
-        marcado_analisar =:marcado_analisar, 
-        dt_analisado =:dt_analisado,
-        pagina_analisada =:pagina_analisada, 
-        id_documento_analisado =:id_analisado 
-        WHERE ta.numerounico=:numero_processo
-    """)
-
-    session.execute(textosql, {
-        'tipo_documento': resultado['tipo_documento'],
-        'analisado': True,
-        'aplica_portaria': any(resultado['aplicacao_incisos']),
-        'possui_medicamentos': len(resultado['lista_medicamentos']) > 0,
-        'possui_internacao': resultado['internacao'] if resultado['internacao'] is not None else False,
-        'possui_consultas_exames_procedimentos': resultado['possui_consulta'] if resultado['possui_consulta'] is not None else False,
-        'possui_insulina': len(resultado['lista_glicemico']) > 0,
-        'possui_insumos': len(resultado['lista_insumos']) > 0,
-        'possui_multidisciplinar': len(resultado['lista_tratamento']) > 0,
-        'possui_custeio': resultado['possui_custeio'] if resultado['possui_custeio'] is not None else False,
-        'possui_compostos': len(resultado['lista_compostos']) > 0,
-        'possui_condenacao_honorarios': resultado['condenacao_honorarios'] if resultado['condenacao_honorarios'] is not None else False,
-        'possui_danos_morais': resultado['indenizacao'] if resultado['indenizacao'] is not None else False,
-        'respeita_valor_teto': resultado['respeita_valor_teto'] if resultado['respeita_valor_teto'] is not None else False,
-        'lista_outros': resultado['lista_outros'],
-        'custo_analise': resultado['custollm'],
-        'input_tokens': resultado['tokensllm'][0],
-        'completion_tokens': resultado['tokensllm'][1],
-        'numero_processo': n_processo,
-        'resumo': resultado['resumo'],
-        'resumo_analise': resultado['resumo_analise'],
-        'marcado_analisar': True,
-        'dt_analisado': datetime.now(),
-        'pagina_analisada': resultado['primeira_pagina'] if 'primeira_pagina' in resultado else None,
-        'id_analisado': id_andamento
-    })
-
-    # INSERÇÃO NA TABELA DE MEDICAMENTOS
-    for medicamento in resultado['lista_medicamentos']:
-        textosql1 = text("SELECT * from db_pge.scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numero_processo")
-        buscaidportaria = session.execute(textosql1, {'numero_processo': n_processo}).fetchone()
-        idportaria = buscaidportaria[0]
-        
-        buscaultimoid = session.execute(text("SELECT MAX(tm.id) from db_pge.scm_robo_intimacao.tb_medicamentos tm")).fetchone()
-        idmedicamento = (buscaultimoid[0] or 799) + 1
-
-        insercaoAM = session.execute(text("""
-            INSERT into db_pge.scm_robo_intimacao.tb_medicamentos 
-            (id, id_analiseportaria, nome_principio, nome_comercial, dosagem, possui_anvisa, registro_anvisa, fornecido_SUS, valor) 
-            values(:id, :id_analiseportaria, :nome_principio, :nome_comercial, :dosagem, :possui_anvisa, :registro_anvisa, :fornecido_SUS, :valor)
-        """), {
-            'id': idmedicamento,
-            'id_analiseportaria': idportaria,
-            'nome_principio': medicamento['nome_principio'],
-            'nome_comercial': medicamento['nome_comercial'],
-            'dosagem': medicamento['dosagem'],
-            'possui_anvisa': medicamento['registro_anvisa'] is not None,
-            'registro_anvisa': medicamento['registro_anvisa'],
-            'fornecido_SUS': medicamento['oferta_SUS'] or False,
-            'valor': medicamento['preco_PMVG'].replace('R$', '')
-        })
-        
-    
-    # INSERÇÃO NA TABELA DE COMPOSTOS ALIMENTARES
-    for alimento in resultado['lista_compostos']:
-        textosql1 = text("SELECT * from db_pge.scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numero_processo")
-        buscaidportaria = session.execute(textosql1, {'numero_processo': n_processo}).fetchone()
-        idportaria = buscaidportaria[0]
-
-        buscaultimoid = session.execute(text("SELECT MAX(tc.id) from db_pge.scm_robo_intimacao.tb_compostos tc")).fetchone()
-        idcomposto = (buscaultimoid[0] or 0) + 1  # Incrementa o ID, começando de 1 se vazio
-
-        insercaoAC = session.execute(text("""
-            INSERT into db_pge.scm_robo_intimacao.tb_compostos
-            (id, id_analiseportaria, nome_composto, qtde, duracao, possui_anvisa, registro_anvisa, valor)
-            values(:id, :id_analiseportaria, :nome_composto, :qtde, :duracao, :possui_anvisa, :registro_anvisa, :valor)
-        """), {
-            'id': idcomposto,
-            'id_analiseportaria': idportaria,
-            'nome_composto': alimento['nome'],
-            'qtde': alimento['quantidade'],
-            'duracao': alimento['duracao'],
-            'possui_anvisa': alimento.get('possui_anvisa', None),
-            'registro_anvisa': alimento.get('registro_anvisa', None),
-            'valor': alimento.get('valor', None)
-        })
-    
-    
-    session.commit()
-
-
-
-
-# Captura os ids dos documentos e suas informações a partir de um processo (e o id, pois podem haver vários processos com o mesmo numerounico)
-# Preenche essas informações no banco de dados tabela tb_documentos
-def captura_ids_processo(n_processo, id_dado=None, SelecaoAutomaticaDocumento = True):
-
-    
-    path = importar_autos_alfresco(n_processo)
-    if not path: 
-        print("processo não encontrado no Alfresco")
-        return False
-    # Função para capturar o id_analiseportaria dado o número do processo
-    engine = create_engine(DATABASE_URL)
-    Session = sessionmaker(bind=engine)
-
-    metadata = MetaData()
-    session = Session()
-
-
-    #Devo modificar a extração dos autos para retornar o processo escolhido e também a tabela já processada, faça colocando duas funções diferentes
-    # Suba a função do Pdf plumber, o local dela é aqui
-    pages_to_check = extract_pages_to_check(path)
-    document_info = extract_document_info_from_pages(path, pages_to_check)
-
-
-    # Se um ID for passado, usa-o diretamente;
-    if id_dado is not None:
-        id_analiseportaria = id_dado
-    # Se não for passado um id e robô de análise de processos estiver desativado,
-    #  então faz a consulta
-    else:
-        query = text('SELECT numerounico, id FROM scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numeroprocesso and analisado is null')
-        resultado = session.execute(query, {"numeroprocesso": n_processo}).fetchone()
-        id_analiseportaria=  resultado[1]
-        if resultado:
-            id_analiseportaria = resultado[1]
-        else:
-            # Se não houver resultado, encerra a função com uma indicação de falha
-            session.close()
-            #Comentei pq não fazia sentido estar aqui 
-            #pdf_document.close()
-            if os.path.isfile(path):
-                os.remove(path)
-            return False
-    
-    for dados in document_info:
-        try:
-            id_doc = dados[0]
-            data_assinatura = dados[1].replace('\n',' ')
-            documento = dados[2].replace('\n',' ')
-            tipo = dados[3]
-            res =  session.execute(text('SELECT Max(id) as valor_max FROM db_pge.scm_robo_intimacao.tb_documentosautos')).fetchone()
-            max_id = res[0] + 1
-            query_check = text('SELECT numerounico,id_documento FROM db_pge.scm_robo_intimacao.tb_documentosautos WHERE numerounico = :numeroprocesso AND id_documento = :iddocumento')
-            check = session.execute(query_check, {"numeroprocesso":n_processo,"iddocumento": id_doc}).fetchone()
-            if check is None:
-                insercao = session.execute(text('INSERT into db_pge.scm_robo_intimacao.tb_documentosautos (id, numerounico, id_documento, dt_assinatura, nome,  tipo, id_analiseportaria)values(:id, :numerounico, :id_documento,:dt_assinatura, :nome, :tipo, :id_analiseportaria)'),{'id':max_id,'numerounico':n_processo,'id_documento':id_doc,'dt_assinatura':data_assinatura,'nome':f'{documento}','tipo':tipo,'id_analiseportaria':id_analiseportaria})
-            else: 
-                continue
-        except Exception as e:
-            print(f"Erro ao processar {n_processo}: {e}")
-            continue 
-
-
-    session.commit() 
-
-    # Subparte da função que faz a análise de autos, por questões de organização, nas próximas versões é bom ser 
-    # uma função a parte
-    if SelecaoAutomaticaDocumento == True:
-        interesses = ["Petição Inicial", "Decisão", "Sentença",'Interlocutória']
-        forca_peticao = 0
-        IdAndamentoPortaria = CheckIdOfInterest(path,document_info,interesses,forca_peticao)
-        insercao_idanaliseportaria = session.execute(text('''
-            UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
-            SET id_documento_analisado=:IdAndamentoPortaria
-                                            
-            WHERE id=:id_analiseportaria;
-        '''), {
-            'id_analiseportaria': id_analiseportaria,
-            'IdAndamentoPortaria': IdAndamentoPortaria
-            
-        })
-        session.commit()           
-    
-    if os.path.isfile(path):
-        os.remove(path) 
-    return True
-
 def encontrar_arquivo(nome_arquivo):
     
-    nome_arquivo_comp = f"{nome_arquivo}.pdf"
-    diretorio_arquivos = f'temp/'  
+    nome_arquivo_comp = f"portaria_temp.pdf"
+    diretorio_arquivos = f'temp/'
     for raiz, _, arquivos in os.walk(diretorio_arquivos):
         if nome_arquivo_comp in arquivos:
             caminho_completo = os.path.join(raiz, nome_arquivo_comp)
             return caminho_completo
     return False
 
-#  ler o texto do PDF
-def read_pdf(file_path):
-    from PyPDF2 import PdfReader
-
-    with open(file_path, 'rb') as file:
-        reader = PdfReader(file)
-        text = ''
-        for page_num in range(len(reader.pages)):
-            page = reader.pages[page_num]
-            text += page.extract_text()
-    return text
-
-# dividir o texto em partes menores
-def split_text(text, max_length):
-    words = text.split()
-    current_length = 0
-    current_chunk = []
-    chunks = []
-
-    for word in words:
-        current_length += len(word) + 1  # +1 para o espaço
-        if current_length > max_length:
-            chunks.append(' '.join(current_chunk))
-            current_chunk = [word]
-            current_length = len(word) + 1
-        else:
-            current_chunk.append(word)
-
-    if current_chunk:
-        chunks.append(' '.join(current_chunk))
-
-    return chunks
 
 
-'''
-def get_specific_info(text, api_key):
+# Função para processar PDFs e extrair algumas informações importantes para o contexto de geração de despacho
 
-    openai.api_key = api_key
-    try:
-        response = openai.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "Você é um jurista especializado em decisões judiciais."},
-                {"role": "user", "content": f"Extraia as seguintes informações do texto judicial:\n\n\
-                1. Identificação do Despacho: Indicação de que se trata de uma sentença judicial.\n\
-                2. Decisão sobre o Pleito: Indicação de que o pleito autoral foi julgado procedente e a decisão antecipatória de tutela foi ratificada.\n\
-                3. Especificação do Medicamento: Nome do medicamento e detalhes, como a dosagem. Confirmação de que o medicamento está registrado na ANVISA.\n\
-                4. Danos Morais: Afirmativa sobre a ausência de danos morais.\n\
-                5. Direcionamentos Finais: Instruções sobre não interpor recurso se cabível. Orientações para comunicar a Secretaria de Estado da Saúde (SESA) ou outras entidades sobre a decisão. Direções sobre arquivamento do processo conforme orientação da chefia.\n\
-                \nTexto: {text}"}
-            ]
+def process_pdf(file_path, api_key):
+    """
+    Processa um arquivo PDF para extrair informações específicas.
+    """
+    
+    # Configura o modelo OpenAI através do LangChain
+    #llm = OpenAI(model="gpt-4o", temperature=0)
+    llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=api_key)
+
+    # Carrega o conteúdo do PDF
+    loader = PyPDFLoader(file_path)
+    documents = loader.load()
+
+    # Concatena todo o texto do PDF
+    full_text = "".join([doc.page_content for doc in documents])
+
+    # Template do prompt para extração
+    prompt_template = PromptTemplate(
+        input_variables=["text"],
+        template=(
+            "Você é um jurista especializado em decisões judiciais. Com base no texto a seguir, "
+            "extraia as seguintes informações:\n\n"
+            "1. Identificação do Despacho: Indicação de que se trata de uma sentença judicial.\n"
+            "2. Sentença do mérito: identificar a sentença do mérito, ou seja se é com ou sem mérito.\n"
+            "3. Decisão sobre o Pleito/Mérito: Indicação de se o pleito autoral foi julgado procedente "
+            "e a decisão antecipatória de tutela foi ratificada.\n"
+            "4. Detalhes da internação: Se houver internação, especificar o tipo do Leito ou Tipo de Internação.\n"
+            "5. Especificação do Medicamento: Se houver medicamento, especificar o nome do medicamento "
+            "e detalhes, como a dosagem. Confirmação de que o medicamento está registrado na ANVISA.\n"
+            "6. Especificação da Consulta, exame ou procedimento: Se houver consulta, exame ou procedimento, especificar os detalhes.\n\n"
+            "Texto: {text}"
         )
-        extracted_info = response.choices[0].message.content.strip()
-        return extracted_info
-    except Exception as e:
-        print(f"Error during API call: {e}")
-        return ""
-'''
+    )
+
+    # Configurar a cadeia
+    chain = LLMChain(llm=llm, prompt=prompt_template)
+
+    # Executar o modelo no texto completo
+    full_response = chain.run(text=full_text)
+
+    return full_response
 
 
-def get_specific_info(text, api_key):
-    openai.api_key = api_key
-    try:
-        response = openai.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "Você é um jurista especializado em decisões judiciais."},
-                {"role": "user", "content": f"Extraia as seguintes informações do texto judicial:\n\n\
-                1. Identificação do Despacho: Indicação de que se trata de uma sentença judicial.\n\
-                2. Sentença do mérito: identificar a sentença do mérito, ou seja se é com ou sem mérito.\n\
-                3. Decisão sobre o Pleito/Mérito: Indicação de se o pleito autoral foi julgado procedente e a decisão antecipatória de tutela foi ratificada.\n\
-                4. Detalhes da internação: Se houver internação, especificar o tipo do Leito ou Tipo de Internação.\n\
-                5. Especificação do Medicamento: Se houver medicamento, especificar o nome do medicamento e detalhes, como a dosagem. Confirmação de que o medicamento está registrado na ANVISA.\n\
-                6. Especificação da Consulta, exame ou procedimento: Se houver consulta, exame ou procedimento, especificar os detalhes.\n\
-                \nTexto: {text}"}
-            ]
-        )
-        extracted_info = response.choices[0].message.content.strip()
-        return extracted_info
-    except Exception as e:
-        print(f"Error during API call: {e}")
-        return ""
-
-# processar todos os PDFs de uma pasta no Google Drive
-def process_pdfs_from_drive(file_path, api_key):
-    extracted_data = []
-
-    #for filename in os.listdir(folder_path):
-        #if filename.endswith(".pdf"):
-    #file_path = os.path.join(folder_path, filename)
-    pdf_text = read_pdf(file_path)
-    chunks = split_text(pdf_text, 10000)
-
-    full_text = ""
-    for chunk in chunks:
-        full_text += chunk
-
-    # Extrair informações do texto completo
-    extracted_info = get_specific_info(full_text, api_key)
-    filename = os.path.basename(file_path)
-    extracted_data.append((filename, extracted_info))
-
-    return extracted_data
-
-def grava_despacho_bd(fk,despacho,session):
-    insercaoAM = session.execute(text('''
-            UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
-            SET despacho_gerado=:despacho
-                                            
-            WHERE fk_autosprosaude=:fk;
-        '''), {
-            'despacho': despacho,
-            'fk': fk
-            
-        })
+def grava_despacho_bd(id, despacho, session, tokens, cost):
+    """
+    Atualiza o despacho gerado e soma os valores de input_tokens, completion_tokens e custo_analise na tabela.
+    """
+    query = text('''
+        UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria
+        SET despacho_gerado = :despacho,
+            input_tokens = COALESCE(input_tokens, 0) + :input_tokens,
+            completion_tokens = COALESCE(completion_tokens, 0) + :completion_tokens,
+            custo_analise = COALESCE(custo_analise, 0) + :cost
+        WHERE id = :id;
+    ''')
+    
+    session.execute(query, {
+        'despacho': despacho,
+        'input_tokens': tokens[0],
+        'completion_tokens': tokens[1],
+        'cost': cost,
+        'id': id
+    })
+    
     session.commit()
 
 
@@ -808,224 +856,158 @@ def selecionar_template(resultado_analise):
     aplicacao_incisos = any(resultado_analise.get('aplicacao_incisos', []))
     internacao = resultado_analise.get('internacao', False)
     consulta_exame_procedimento = resultado_analise.get('possui_consulta', False)
+    possui_insumos = resultado_analise.get('possui_outros', False)
     lista_medicamentos = resultado_analise.get('lista_medicamentos', [])
     lista_compostos = resultado_analise.get('lista_compostos', [])
+    #houve_extincao = resultado_analise.get('houve_extincao', False)
+    #cumprimento_de_sentenca = resultado_analise.get('cumprimento_de_sentenca', False)
+    #bloqueio_de_recursos = resultado_analise.get('bloqueio_de_recursos', False)
+    
     
     # Mapear templates para diferentes tipos de documentos
     templates = {
         'Sentença': {
             'medicamento': TEMPLATE_SENTENCA_MEDICAMENTO,
-            'internacao_aplica': TEMPLATE_SENTENCA_INTERNACAO,
-            'internacao_nao_aplica': TEMPLATE_sentenca_INTERNACAO_semportaria,
-            'composto_alimentar_aplica': TEMPLATE_SENTENCA_COMPOSTO_ALIMENTAR,
-            'composto_alimentar_nao_aplica': TEMPLATE_SENTENCA_COMPOSTO_ALIMENTAR,
-            'consulta_exame_procedimento_aplica': TEMPLATE_SENTENCA_UNIFICADA,
-            'consulta_exame_procedimento_nao_aplica': TEMPLATE_SENTENCA_UNIFICADA,
+            'internacao': TEMPLATE_SENTENCA_INTERNACAO,
+            'composto_alimentar': TEMPLATE_SENTENCA_COMPOSTOS,
+            'consulta_exame_procedimento': TEMPLATE_SENTENCA_UNIFICADA,
+            'insumos': TEMPLATE_SENTENCA_INSUMOS,
         },
         'Decisão Interlocutória': {
             'medicamento': TEMPLATE_DECISAO_MEDICAMENTO,
+            'internacao': TEMPLATE_DECISAO_INTERNACAO,
+            'composto_alimentar': TEMPLATE_DECISAO_COMPOSTOS,
+            'consulta_exame_procedimento': TEMPLATE_DECISAO_UNIFICADA,
+            'insumos': TEMPLATE_DECISAO_INSUMOS,
+        },
+        'Petição Inicial': {
+            'medicamento': TEMPLATE_DECISAO_MEDICAMENTO,
             'internacao_aplica': TEMPLATE_DECISAO_INTERNACAO,
-            'internacao_nao_aplica': TEMPLATE_DECISAO_INTERNACAO_Semportaria,
-            'composto_alimentar_aplica': TEMPLATE_DECISAO_COMPOSTO_ALIMENTAR,
-            'composto_alimentar_nao_aplica': TEMPLATE_DECISAO_COMPOSTO_ALIMENTAR,
-            'consulta_exame_procedimento_aplica': TEMPLATE_DECISAO_INTERNACAO3,
-            'consulta_exame_procedimento_nao_aplica': TEMPLATE_DECISAO_INTERNACAO_Semportaria,
+            'composto_alimentar_aplica': TEMPLATE_DECISAO_COMPOSTOS,
+            'consulta_exame_procedimento': TEMPLATE_DECISAO_UNIFICADA,
+            'insumos': TEMPLATE_DECISAO_INSUMOS,
         }
     }
+
     
     # Verificar o tipo de documento
     if tipo_documento in templates:
+        
         # Medicamento
         if len(lista_medicamentos) > 0:
             return {"template": templates[tipo_documento]['medicamento']}
         
         # Internação
         if internacao:
-            if aplicacao_incisos:
-                return {"template": templates[tipo_documento]['internacao_aplica']}
-            else:
-                return {"template": templates[tipo_documento]['internacao_nao_aplica']}
-        
+            return {"template": templates[tipo_documento]['internacao']}
+            
         # Composto Alimentar
         if len(lista_compostos) > 0:
-            if aplicacao_incisos:
-                return {"template": templates[tipo_documento]['composto_alimentar_aplica']}
-            else:
-                return {"template": templates[tipo_documento]['composto_alimentar_nao_aplica']}
-        
+            return {"template": templates[tipo_documento]['composto_alimentar']}
+            
         # Consultas Exames ou Procedimentos
         if consulta_exame_procedimento:
-            if aplicacao_incisos:
-                return {"template": templates[tipo_documento]['consulta_exame_procedimento_aplica']}
-            else:
-                return {"template": templates[tipo_documento]['consulta_exame_procedimento_nao_aplica']}
+            return {"template": templates[tipo_documento]['consulta_exame_procedimento']}
         
+        # Composto Alimentar
+        if possui_insumos:
+            return {"template": templates[tipo_documento]['insumos']}
+            
     # Caso nenhum template seja encontrado
     print('Sem Template')
     return None
 
-"""
-def selecionar_template(resultado_analise):
-    if resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and len(resultado_analise['lista_medicamentos']) > 0:       
-        data = {
-        "template": TEMPLATE_sentenca_MEDICAMENTO
-        }
-        print('Template Sentença - Medicamento')
-        
-    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and len(resultado_analise['lista_medicamentos']) > 0:
-        data = {
-        "template": TEMPLATE_DECISAO_MEDICAMENTO
-        }
-        print('Template Decisão - Medicamento')
-    elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and resultado_analise['internacao'] is True:
-        data = {
-        "template": TEMPLATE_sentenca_INTERNACAO3
-        }
-        print('Template Sentença - Internação - Aplica')
-    elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is False and resultado_analise['internacao'] is True:
-        data = {
-        "template": TEMPLATE_sentenca_INTERNACAO_semportaria
-        }
-        print('Template Sentença - Internação - Não Aplica')
-        
-    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and resultado_analise['internacao'] is True:
-        data = {
-        "template": TEMPLATE_DECISAO_INTERNACAO3
-        }
-        print('Template Decisão - Internação - Aplica')
-    
-    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is False and resultado_analise['internacao'] is True :
-        data = {
-        "template": TEMPLATE_DECISAO_INTERNACAO_Semportaria
-        }
-        print('Template Decisão - Internação - Não Aplica')    
-
-
-        print('Template Decisão - Internação - Aplica')
-    elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and len(resultado_analise['lista_compostos']) > 0:
-        data = {
-        "template": TEMPLATE_SENTENCA_COMPOSTO_ALIMENTAR
-        }
-        print('Template Sentença - Composto Alimentar')
-
-    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and len(resultado_analise['lista_compostos']) > 0:
-        data = {
-        "template": TEMPLATE_DECISAO_COMPOSTO_ALIMENTAR
-        }
-        print('Template Decisão- Composto Alimentar')
-    elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and (('cirurgia' in resultado_analise['lista_outros']) or ('procedimento' in resultado_analise['lista_outros'])):
-        data = {
-        "template": TEMPLATE_sentenca_CIRURGIA
-        }
-        print('Template Sentença - Cirurgia')
-
-    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and (('cirurgia' in resultado_analise['lista_outros']) or ('procedimento' in resultado_analise['lista_outros'])):
-        data = {
-        "template": TEMPLATE_DECISAO_cirugia
-        }
-        print('Template Decisão - Cirurgia')
-
-    elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and ('exame' in resultado_analise['lista_outros']):
-        data = {
-        "template": TEMPLATE_sentenca_EXAMES
-        }
-        print('Template Sentença - Exame')    
-
-    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and ('exame' in resultado_analise['lista_outros']):
-        data = {
-        "template": TEMPLATE_DECISAO_exame
-        }
-        print('Template Decisão - Exame')  
-
-    elif resultado_analise['tipo_documento'] == 'Sentença' and any(resultado_analise['aplicacao_incisos']) is True and (('consulta' in resultado_analise['lista_outros']) or ('atendimento' in resultado_analise['lista_outros'])):
-        data = {
-        "template": TEMPLATE_sentenca_CONSULTA
-        }
-        print('Template Sentença - Consulta')  
-
-    elif resultado_analise['tipo_documento'] == 'Decisão Interlocutória' and any(resultado_analise['aplicacao_incisos']) is True and (('consulta' in resultado_analise['lista_outros']) or ('atendimento' in resultado_analise['lista_outros'])):
-        data = {
-        "template": TEMPLATE_DECISAO_consulta
-        }
-        print('Template Decisão - Consulta')      
-
-    else:  
-
-        data = False
-        print('Sem Template')
-        
-    return data
-"""
-
-def gerar_despacho(n_processo,session,resultado_analise):
+def gerar_despacho(id_analiseportaria,session,resultado_analise):
 
     ### Parte responsável pela  busca no banco de dados:
     # Pesquisa o
-    query = text('SELECT ta.fk_autosprosaude,ta.possui_outros,ta.possui_medicamentos,ta.possui_condenacao_honorarios,ta.aplica_portaria,ta.numerounico,ta.dt_processado FROM scm_robo_intimacao.tb_analiseportaria ta INNER JOIN (SELECT numerounico, Max(dt_processado) AS data_max FROM db_pge.scm_robo_intimacao.tb_analiseportaria tb GROUP BY numerounico) AS tabela_data_max ON tabela_data_max.numerounico =  ta.numerounico AND tabela_data_max.data_max = ta.dt_processado  WHERE ta.analisado is true AND ta.numerounico =:numeroprocesso')
-    resultado = session.execute(query, {"numeroprocesso":n_processo}).fetchone()
-
-    nome_arquivo =  resultado[0]
-
-
-    json_file_path = 'dl_extracted_data.json'
-
-    """
-    # Estrutura de dados a ser salva
-    dados_json = {
-        "nome_arquivo": f"{nome_arquivo}.pdf",
-        "possui_outros": resultado[1],
-        "possui_medicamento": resultado[2],
-        "possui_condenacao_honorario": resultado[3]
-    }
-    """
+    query = text('''
+    SELECT 
+        ta.id,
+        ta.fk_autosprosaude,
+        ta.possui_outros,
+        ta.possui_medicamentos,
+        ta.possui_condenacao_honorarios,
+        ta.aplica_portaria,
+        ta.numerounico,
+        ta.dt_processado,
+        ta.houve_extincao,
+        ta.cumprimento_de_sentenca,
+        ta.bloqueio_de_recursos,
+        ta.monocratica
+    FROM scm_robo_intimacao.tb_analiseportaria ta
+    WHERE ta.id = :id_analiseportaria
+    ''')
     
-    # Estrutura de dados a ser salva
-    # Estrutura de dados a ser salva
-    """
-    dados_json = {
-        "Informações da análise do processo": {
-            "Nome do Arquivo": f"{nome_arquivo}.pdf",
-            "Foram detectados medicamentos no documento analisado": resultado[2],
-            "Foi detectada condenação por honorários": resultado[3],
-            "Foi verificado a aplicação da Portaria 01/2017": resultado[4]
-        }
-    }
+    #resultado = session.execute(query, {"numeroprocesso":n_processo}).fetchone()
+    #retorna o resultado como dicionario
+    resultado = session.execute(query, {"id_analiseportaria": id_analiseportaria}).mappings().fetchone()
     
-    """
+    nome_arquivo =  resultado["fk_autosprosaude"]
+
 
     dados_json = {
     "Informações da análise do processo": {
         "Nome do Arquivo": f"{nome_arquivo}.pdf",
         "Análise de medicamentos no documento": (
             "Foram detectados medicamentos no documento analisado"
-            if resultado[2]
+            if resultado["possui_medicamentos"]
             else "Não foram detectados medicamentos no documento analisado"
         ),
         "Condenação por honorários": (
             "Houve condenação por honorários"
-            if resultado[3]
+            if resultado["possui_condenacao_honorarios"]
             else "Não houve condenação por honorários"
         ),
         "Aplicação da Portaria 01/2017": (
             "Foi verificada a aplicação da Portaria 01/2017"
-            if resultado[4]
+            if resultado["aplica_portaria"]
             else "Não foi verificada a aplicação da Portaria 01/2017"
-        )
-        }
+        ),
+    }
     }
 
 
+    #Caso seja extinção, bloqueio ou cumprimento, não há necessidade de fazer leitura do documento
+    
+    # Verificar condições específicas
+    """
+    if resultado["houve_extincao"]:
+        despacho = "R.H. Não é objeto de aplicação da Portaria 01/2017 por se tratar de processo extinto. Encaminhe-se à assessoria para análise."
+        grava_despacho_bd(resultado["id"], despacho, session)
+        return True
+
+    if resultado["cumprimento_de_sentenca"]:
+        despacho = "R.H. Não é objeto de aplicação da Portaria 01/2017 por se tratar de decisão de cumprimento de sentença. Encaminhe-se à assessoria para análise."
+        print(f"E por que nao grava o despacho:{despacho}")
+        
+        grava_despacho_bd(resultado["id"], despacho, session)
+        return True
+    """
+    
+    if resultado["bloqueio_de_recursos"]:
+        despacho = "R.H. Não é objeto de aplicação da Portaria 01/2017 por haver bloqueio de verbas ou contas. Encaminhe-se à assessoria para análise."
+        grava_despacho_bd(resultado["id"], despacho, session)
+        return True
+
+    if resultado["monocratica"]:
+        despacho = "R.H. Não é objeto de aplicação da Portaria 01/2017 por se tratar de decisão monocrática. Encaminhe-se à assessoria para análise."
+        grava_despacho_bd(resultado["id"], despacho, session)
+        return True
+    
     # Escrever as informações extraídas em um arquivo JSON
-    with open(json_file_path, mode='w', encoding='utf-8') as file:
+    with open('dl_extracted_data.json', mode='w', encoding='utf-8') as file:
         json.dump(dados_json, file, ensure_ascii=False, indent=4)
 
     print("DataFrame convertido e salvo em formato JSON com sucesso.")
-
+    
     ### Parte responsável pela análise do arquivo pdf 
 
     caminho_arquivo =  encontrar_arquivo(nome_arquivo)
     if not caminho_arquivo:
+        print("Não encontrou o arquivo.")
         return False
+    
     
     # Configuração da chave da API GPT 
     env_path = os.path.join(base_directory, 'ambiente.env')
@@ -1035,272 +1017,128 @@ def gerar_despacho(n_processo,session,resultado_analise):
     api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY não está definida")
+    
+    #Extrai as informacoes do documento
+    pdf_extracted_data = process_pdf(caminho_arquivo, api_key)
+    
 
-    pdf_extracted_data = process_pdfs_from_drive(caminho_arquivo, api_key)
-
-    # Caminho do arquivo JSON
-    json_file_path = 'pdf_extracted_data.json'
+    #fname = os.path.basename(caminho_arquivo)
 
     # Estrutura de dados a ser salva
-    data_to_save = [{"File Name": data[0], "Extracted Information": data[1]} for data in pdf_extracted_data]
-
+    data_to_save = [{"File Name": f"{nome_arquivo}.pdf", "Extracted Information": pdf_extracted_data}]
+    
+    
     # Escrever as informações extraídas em um arquivo JSON
-    with open(json_file_path, mode='w', encoding='utf-8') as file:
+    with open('pdf_extracted_data.json', mode='w', encoding='utf-8') as file:
         json.dump(data_to_save, file, ensure_ascii=False, indent=4)
 
     print("Informações extraídas salvas no arquivo JSON com sucesso.")
-
+    
     ## Mesclando os json em um só:
 
     # Carregar os arquivos JSON
     with open('dl_extracted_data.json', 'r', encoding='utf-8') as file1:
         output_dl = json.load(file1)
+        
+    #print(f"OUTPUT_DL: {output_dl}")
 
     with open('pdf_extracted_data.json', 'r', encoding='utf-8') as file2:
         pdf_extracted_data = json.load(file2)
+
+    #print(f"PDF_EXTRACTED_DATA: {output_dl}")
 
     # Criar um dicionário de busca para pdf_extracted_data baseado no "File Name"
     pdf_data_dict = {item['File Name']: item for item in pdf_extracted_data}
     # Mesclar os arquivos com base no nome do arquivo
     merged_data = []
-    #file_name = output_dl.get("Nome do Arquivo")
-    file_name = output_dl["Informações da análise do processo"]["Nome do Arquivo"]
-    if file_name in pdf_data_dict:
-        merged_entry = {**output_dl, **pdf_data_dict[file_name]}
-        merged_data.append(merged_entry)
 
-
+    merged_entry = {**output_dl, **pdf_data_dict}
+    merged_data.append(merged_entry)
 
 
     # Salvar o arquivo mesclado
     with open('merged_output.json', 'w', encoding='utf-8') as output_file:
         json.dump(merged_data, output_file, ensure_ascii=False, indent=4)
 
+    
+
     print("Os arquivos foram mesclados com sucesso.")
+    print(f"MERGED DATA: {merged_data}")
   
     with open('merged_output.json', 'r', encoding='utf-8') as file3:
         dadosextraidos = json.load(file3)
-
-    # Parte responsável por gerar o despacho
-    base_url = 'http://127.0.0.1:5000' # Adjust this to match your server's address and port
-
-    #Parâmetros que o usuário deve passar
-    params = {
-        "knowledge_area": "SENTENCA JUDICIAL",
-        'area': "SENTENCA JUDICIAL - DESPACHO MEDICO",
-        'subject': (
-            "SENTENCA JUDICIAL - DESPACHO MEDICO",
-        ),
-        'topic': (
-            "SENTENCA JUDICIAL - DESPACHO MEDICO"
-        ),
-        'context': dadosextraidos,
-    }
-    # Encode the query parameters
-    encoded_params = urlencode(params)
-
-    # Construct the full URL with the query parameters
-    url = f'{base_url}/projeto-template?{encoded_params}'
-    print(url)
-
-    data = selecionar_template(resultado_analise)
-
-    if not data:
-        return False
-
-    with requests.Session() as client:
-        # Make the GET request
-        response = client.post(
-            url,
-            json=data,
-            headers={"Content-Type": "application/json"}
-        )
-
-        # Check if the request was successful
-        if response.ok and response.status_code == 200:
-            # Parse the JSON response
-            data = response.json()
-            print(response)
-        else:
-            print(f"Request failed with status code {response.status_code}")
-
-    despacho  = data['result']['sections'][0]['content'][0]['paragraph']
-    grava_despacho_bd(nome_arquivo,despacho,session)
     
-    return True
+    # Preparar o modelo de LangChain com o template
+    #llm = OpenAI(model="gpt-4o", temperature=0)
+    llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=api_key)
 
-
-"""
-def grava_resultado_BD(n_processo, id_andamento, resultado, session):
-
-    #RESUMO
-    tempRESUMO = resultado['resumo']
-
-    
-    #TIPO DE DOCUMENTO
-    tempTIPODOCUMENTO = resultado['tipo_documento']
-    
-    #APLICAÇÃO DE PORTARIA
-    tempAPLICAPORTARIA =any(resultado['aplicacao_incisos'])
-    #if(True in tempAPLICAPORTARIA):
-    #    tempAPLICAPORTARIA = True
-
-    #MEDICAMENTOS
-    tempLISTA_MEDICAMENTOS = resultado['lista_medicamentos']
-
-    if(len(tempLISTA_MEDICAMENTOS)>0):
-        tempPOSSUI_MEDICAMENTOS = True
-    else:
-        tempPOSSUI_MEDICAMENTOS = False
-
-    #INTERNAÇÃO
-    tempINTERNACAO = False if resultado['internacao'] is None else resultado['internacao']
-
-
-    #CONSULTAS, EXAMES, PROCEDIMENTOS
-    tempCEP = resultado['lista_intervencoes']
-    if(len(tempCEP)>0):
-        tempPOSSUI_CEP = True
-    else:
-        tempPOSSUI_CEP = False
-
-    #INSULINA
-    tempINSULINA = resultado['lista_glicemico']
-    if(len(tempINSULINA)>0):
-        tempPOSSUI_INSULINA = True
-    else:
-        tempPOSSUI_INSULINA = False
-
-    #INSUMOS
-    tempINSUMOS = resultado['lista_insumos']
-    if(len(tempINSUMOS)>0):
-        tempPOSSUI_INSUMOS = True
-    else:
-        tempPOSSUI_INSUMOS = False
-
-    #MULTIDISCIPLINAR
-    tempMULTI = resultado['lista_tratamento']
-    if(len(tempMULTI)>0):
-        tempPOSSUI_MULTI = True
-    else:
-        tempPOSSUI_MULTI = False
-    
-    #TETO
-    tempTETO = False if resultado['respeita_valor_teto'] is None else resultado['respeita_valor_teto']
-
-    #CUSTEIO
-    tempCUSTEIO = False if resultado['possui_custeio'] is None else resultado['possui_custeio']
-
-    #COMPOSTOS
-    tempCOMPOSTOS = resultado['lista_compostos']
-    if(len(tempCOMPOSTOS)>0):
-        tempPOSSUI_COMPOSTOS = True
-    else:
-        tempPOSSUI_COMPOSTOS = False
-
-    #DANOS MORAIS
-    tempDANOS_MORAIS = False if resultado['indenizacao'] is None else resultado['indenizacao']
-    
-    #CONDENAÇÃO POR HONORÁRIOS
-    tempCOND_HONOR = False if resultado['condenacao_honorarios'] is None else resultado['condenacao_honorarios']
-    
-    #OUTROS
-    tempPOSSUI_OUTROS = False if resultado['possui_outros'] is None else resultado['possui_outros']
-    tempLISTA_OUTROS = resultado['lista_outros']
-    
-    #OUTROS
-    tempPOSSUI_OUTROS_IMPEDITIVOS = False if resultado['possui_outros_proibidos'] is None else resultado['possui_outros_proibidos']
-    
-    #CUSTO ANÁLISE
-    tempCUSTO = resultado['custollm']
-    
-    #ATUALIZAÇÃO COM OS RESULTADOS DA ANÁLISE
-    textosql = text(F"UPDATE db_pge.scm_robo_intimacao.tb_analiseportaria ta SET tipo_documento = :tipo_documento, analisado = :analisado, aplica_portaria = :aplica_portaria, possui_medicamentos = :possui_medicamentos, possui_internacao = :possui_internacao, possui_consultas_exames_procedimentos = :possui_consultas_exames_procedimentos, possui_insulina = :possui_insulina, possui_insumos = :possui_insumos, possui_multidisciplinar = :possui_multidisciplinar, possui_custeio = :possui_custeio, possui_compostos = :possui_compostos, possui_condenacao_honorarios = :possui_condenacao_honorarios,  possui_danos_morais = :possui_danos_morais, lista_outros = :lista_outros, custo_analise = :custo_analise, resumo =:resumo,marcado_analisar =:marcado_analisar, dt_analisado =:dt_analisado,id_documento_analisado =:id_analisado WHERE ta.numerounico=:numero_processo")
-
-    '''
-    inserir = session.execute(textosql,{
-        'tipo_documento':f'{tempTIPODOCUMENTO}',
-        'analisado':True,
-        'aplica_portaria':f'{tempAPLICAPORTARIA}',
-        'possui_medicamentos':f'{tempPOSSUI_MEDICAMENTOS}',
-        'possui_internacao':f'{tempINTERNACAO}',
-        'possui_consultas_exames_procedimentos':f'{tempPOSSUI_CEP}',
-        'possui_insulina':f'{tempPOSSUI_INSULINA}',
-        'possui_insumos':f'{tempPOSSUI_INSUMOS}',
-        'possui_multidisciplinar':f'{tempPOSSUI_MULTI}',
-        'possui_custeio':f'{tempCUSTEIO}',
-        'possui_compostos':f'{tempPOSSUI_COMPOSTOS}',
-        'possui_outros':f'{tempPOSSUI_OUTROS}',
-        'possui_outros_impeditivos':f'{tempPOSSUI_OUTROS_IMPEDITIVOS}',
-        'possui_condenacao_honorarios':f'{tempCOND_HONOR}',
-        'possui_danos_morais':f'{tempDANOS_MORAIS}',
-        'respeita_valor_teto':{tempTETO} ,
-        'lista_outros':f'{tempLISTA_OUTROS}',
-        'custo_analise':f'{tempCUSTO}',
-        'numero_processo':f'{n_processo}',
-        'resumo':f'{tempRESUMO}',
-        'marcado_analisar' : True,
-        'dt_analisado':datetime.now(),
-        'id_analisado' : id_andamento})
-    '''
-    
-    inserir = session.execute(textosql,{
-        'tipo_documento':f'{tempTIPODOCUMENTO}',
-        'analisado':True,
-        'aplica_portaria':tempAPLICAPORTARIA,
-        'possui_medicamentos':tempPOSSUI_MEDICAMENTOS,
-        'possui_internacao':tempINTERNACAO,
-        'possui_consultas_exames_procedimentos':tempPOSSUI_CEP,
-        'possui_insulina':tempPOSSUI_INSULINA,
-        'possui_insumos':tempPOSSUI_INSUMOS,
-        'possui_multidisciplinar':tempPOSSUI_MULTI,
-        'possui_custeio':tempCUSTEIO,
-        'possui_compostos':tempPOSSUI_COMPOSTOS,
-        'possui_outros':tempPOSSUI_OUTROS,
-        'possui_outros_impeditivos':tempPOSSUI_OUTROS_IMPEDITIVOS,
-        'possui_condenacao_honorarios':tempCOND_HONOR,
-        'possui_danos_morais':tempDANOS_MORAIS,
-        'respeita_valor_teto':tempTETO,
-        'lista_outros':f'{tempLISTA_OUTROS}',
-        'custo_analise':f'{tempCUSTO}',
-        'numero_processo':f'{n_processo}',
-        'resumo':f'{tempRESUMO}',
-        'marcado_analisar' : True,
-        'dt_analisado':datetime.now(),
-        'id_analisado' : id_andamento,
-        'resumo_analise': resultado['resumo_analise']})
+    # Selecionar o template com base no resultado da análise
+    template_selecionado = selecionar_template(resultado_analise)
     
 
-    #INSERÇÃO NA TABELA DE MEDICAMENTOS
-    for i in range(0,len(tempLISTA_MEDICAMENTOS)):
-        #id do análise portaria
-        textosql1 = text(f"SELECT * from db_pge.scm_robo_intimacao.tb_analiseportaria ta WHERE ta.numerounico =:numero_processo")
-        buscaidportaria = session.execute(textosql1,{'numero_processo':f'{n_processo}'})
-        idportaria = buscaidportaria[0]
-        #último id inserido
-        buscaultimoid = session.execute("SELECT * from tb_medicamentos tm ORDER BY tm.id")
-        if(buscaultimoid == None):
-            idmedicamento = 800
-        else:
-            idmedicamento = buscaultimoid[0] + 1
+    # Verificar se o template foi encontrado
+    if not template_selecionado:
+        print("Nenhum template foi selecionado. Operação encerrada.")
+        despacho = "R.H. Não foi possível identificar objeto de aplicação da Portaria 01/2017. Encaminhe-se à assessoria para análise."
+        grava_despacho_bd(resultado["id"], despacho, session)
+        return True
+    
+    # Extrair e formatar o template como string única
+    template = template_selecionado["template"]
+
+    template_string = "\n\n".join([
+        template.get("header", ""),
+        "\n".join(template.get("instructions", [])),
+        template["template"]["Texto Completo"]["description"],
+        "\n".join(template["template"]["Texto Completo"]["elements"]),
+        "Dados fornecidos: {dados}"
+    ])
+
+
+    print("Chegou ate o despacho")
+
+    # Criar o PromptTemplate diretamente
+    prompt_template = PromptTemplate(
+        input_variables=["dados"],
+        template=f"{template_string}\n\nDados fornecidos: {{dados}}"
+    )
+
+    chain = LLMChain(llm=llm, prompt=prompt_template)
+    #chain = RunnableSequence([prompt_template, llm])
+
+    # Dados formatados para o modelo
+    dados_para_prompt = json.dumps(dadosextraidos, ensure_ascii=False, indent=4)
+
+
+    with get_openai_callback() as c1:
+        try:
+            # Gerar o despacho
+            despacho_gerado = chain.run(dados=dados_para_prompt)
+
+            # O custo com a API
+            cost = c1.total_cost
         
-        nome_extraido = tempLISTA_MEDICAMENTOS[i]['nome_extraido']
-        nome_principio = tempLISTA_MEDICAMENTOS[i]['nome_principio']
-        nome_comercial = tempLISTA_MEDICAMENTOS[i]['nome_comercial']
-        dosagem = tempLISTA_MEDICAMENTOS[i]['dosagem']
-        registroanvisa = tempLISTA_MEDICAMENTOS[i]['registro_anvisa']
-        if(registroanvisa != None):
-            possuianvisa = True
-        ofertaSUS = tempLISTA_MEDICAMENTOS[i]['oferta_SUS']
-        if(ofertaSUS == None):
-            ofertaSUS = False
-        precoPMVG = tempLISTA_MEDICAMENTOS[i]['preco_PMVG'].replace('R$','')
+        except Exception as e:
+            print(f"Erro ao gerar o despacho: {str(e)}")
+            atualizar_status(resultado["id"], session, status=5)
+            mensagem = f"Erro na Geração do Despacho: Número único {resultado['numerounico']} e id {resultado['id']} - {str(e)}"
+            print(mensagem)
+            gravar_log(session, resultado['numerounico'], mensagem)
+            raise e  # Relança a exceção para ser tratada em outro nível, se necessário   
+    
+    #cost = CustoGpt4o(c1.prompt_tokens, c1.completion_tokens)
+    tokens = (c1.prompt_tokens, c1.completion_tokens)
+    valor = CustoGpt4o(tokens[0], tokens[1])
+    #print(valor)
+    
+    # Salvar o despacho no banco de dados
+    grava_despacho_bd(resultado["id"], despacho_gerado, session, tokens, valor)
 
-        insercaoAM = session.execute(text('INSERT into db_pge.scm_robo_intimacao.tb_medicamentos (id, id_analiseportaria, nome_principio, nome_comercial, dosagem, possui_anvisa, registro_anvisa, fornecido_SUS, valor) values(:id, :id_analiseportaria, :nome_principio, :nome_comercial, :dosagem, :possui_anvisa, :registro_anvisa, :fornecido_SUS, :valor)'),{'id':f'{idmedicamento}','id_analiseportaria':f'{idportaria}','nome_principio':f'{nome_principio}','nome_comercial':f'{nome_comercial}','dosagem':f'{dosagem}','possui_anvisa':f'{possuianvisa}','registro_anvisa':f'{registroanvisa}','fornecido_SUS':f'{ofertaSUS}','valor':f'{precoPMVG}'})
-    session.commit()
-"""
+    print("Despacho gerado e salvo com sucesso.")
+    return True
+    
 
-#if __name__ =="__main__":
-#    captura_ids_processo('0005003-57.2013.8.06.0156', id=None, SelecaoAutomaticaDocumento=False)
+
+
     
     

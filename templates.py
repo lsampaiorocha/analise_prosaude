@@ -1,4 +1,214 @@
 
+TEMPLATE_SENTENCA_MEDICAMENTO = {
+    "header": "# Modelo para elaboração de sentença judicial sobre fornecimento de medicamentos.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Sentença' refere-se à primeira seção da sentença.",
+        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Sentença' indica a primeira subseção da seção 2.",
+        "Use subsubseções quando necessário para detalhar informações complementares.",
+        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": (
+                "Elabore um despacho sobre uma sentença judicial para concessão de medicamentos, "
+                "baseando-se nos dados fornecidos e na estrutura descrita abaixo. "
+                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
+                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
+            ),
+            "elements": [
+                """
+        Estrutura do Despacho:
+        1. Identificação do Despacho:
+           - Inicie com "R.H.".
+        2. Decisão sobre o Pleito:
+           - Julgue procedente ou improcedente o pleito autoral com resolução de mérito.
+           - Ratifique ou não a decisão antecipatória de tutela previamente concedida.
+           - Exemplo: "TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA."
+        3. Especificação do Medicamento:
+           - Informe o medicamento e detalhes relevantes.
+           - Exemplo: "PARA O FORNECIMENTO DO MEDICAMENTO [especifique o medicamento]."
+        4. Aplicação de Normativas Específicas:
+           - Verificar se existe aplicação de portaria, caso seja aplicável ao caso, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2. Não apresente justificativas do porque.
+           - Exemplo 1: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, I."
+           - Exemplo 2: "NÃO APLICAÇÃO DA PORTARIA 01/2017, tendo em vista se tratar de medicamento."
+        5. Danos Morais:
+           - Verificar se existe condenação por honorários acima de R$1500, e em caso positivo seguir conforme o exemplo 1, caso contrário, seguir o Exemplo 2.
+           - Exemplo 1: "Houve condenação por honorários sucumbenciais acima de R$1500"
+           - Exemplo 2: "Não houve condenação por honorários sucumbenciais acima de R$1500"
+        6. Direcionamentos Finais:
+           - Se existe aplicação de portaria, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2.
+           - Exemplo 1: "VERIFICAR A NECESSIDADE DE ENCAMINHAR OFÍCIO À SESA, E APÓS, ARQUIVAR A PASTA."
+           - Exemplo 2: "Encaminhe-se para análise e elaboração de contestação e recurso."
+
+        Orientações Gerais:
+        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
+        - Utilize o modelo acima como base para criar sentenças adequadas ao caso apresentado.
+        """
+            ]
+        }
+    }
+}
+
+
+
+
+TEMPLATE_SENTENCA_INTERNACAO = {
+    "header": "# Modelo para elaboração de sentença judicial sobre concessão de internação em leito hospitalar especializado.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Sentença' refere-se à primeira seção da sentença.",
+        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Sentença' indica a primeira subseção da seção 2.",
+        "Use subsubseções quando necessário para detalhar informações complementares.",
+        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": (
+                "Elabore um despacho sobre uma sentença judicial para concessão de internação hospitalar, "
+                "baseando-se nos dados fornecidos e na estrutura descrita abaixo. "
+                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
+                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
+            ),
+            "elements": [
+                """
+        Estrutura do Despacho:
+        1. Identificação do Despacho:
+           - Inicie com "R.H.".
+        2. Decisão sobre o Pleito:
+           - Julgue procedente ou parcialmente procedente o pleito autoral com resolução de mérito.
+           - Informe o tipo de internação ou leito determinado 
+           - Exemplo: "TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, CONFIRMANDO A TUTELA ANTECIPATÓRIA PARA [tipo de internação]."
+        3. Detalhes sobre o leito:
+           - Informe os detalhes sobre a internação solicitada.
+        4. Danos Morais:
+           - Indicar se há ou não pedido de condenação por danos morais.
+           - Exemplo: "SEM CONDENAÇÃO EM DANOS MORAIS."
+        5. Custas e Honorários:
+           - Verificar se existe condenação por honorários acima de R$1500, e em caso positivo seguir conforme o exemplo 1, caso contrário, seguir o Exemplo 2.
+           - Exemplo 1: "Houve condenação por honorários sucumbenciais acima de R$1500"
+           - Exemplo 2: "Não houve condenação por honorários sucumbenciais acima de R$1500"
+        6. Aplicação de Normativas Específicas:
+           - Verificar se existe aplicação de portaria, caso seja aplicável ao caso, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2. Não apresente justificativas do porque.
+           - Exemplo 1: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II."
+           - Exemplo 2: "NÃO APLICAÇÃO DA PORTARIA 01/2017."
+        7. Direcionamentos Finais:
+           - Se existe aplicação de portaria, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2.
+           - Exemplo 1: "VERIFICAR A NECESSIDADE DE ENCAMINHAR OFÍCIO À SESA, E APÓS, ARQUIVAR A PASTA."
+           - Exemplo 2: "Encaminhe-se para análise e elaboração de contestação e recurso."
+
+        Orientações Gerais:
+        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
+        - Utilize o modelo acima como base para criar sentenças adequadas ao caso apresentado.
+        """
+            ]
+        }
+    }
+}
+
+
+
+TEMPLATE_SENTENCA_COMPOSTOS = {
+    "header": "# Modelo para elaboração de sentença judicial sobre concessão de compostos alimentares e dietas especiais.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Sentença' refere-se à primeira seção da sentença.",
+        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Sentença' indica a primeira subseção da seção 2.",
+        "Use subsubseções quando necessário para detalhar informações complementares.",
+        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": (
+                "Elabore um despacho sobre uma sentença judicial para concessão de compostos alimentares e dietas especiais, "
+                "baseando-se nos dados fornecidos e na estrutura descrita abaixo. "
+                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
+                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
+            ),
+            "elements": [
+                """
+        Estrutura do Despacho:
+        1. Identificação do Despacho:
+           - Inicie com "R.H.".
+        2. Decisão sobre o Pleito:
+           - Julgue procedente ou parcialmente procedente o pleito autoral com resolução de mérito.
+           - Informe o tipo de internação ou leito determinado 
+           - Exemplo: "TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, CONFIRMANDO A TUTELA ANTECIPATÓRIA PARA [tipo de internação]."
+        3. Danos Morais:
+           - Indicar se há ou não pedido de condenação por danos morais.
+           - Exemplo: "SEM CONDENAÇÃO EM DANOS MORAIS."
+        4. Custas e Honorários:
+           - Verificar se existe condenação por honorários acima de R$1500 e em caso positivo seguir conforme o exemplo 1, caso contrário, seguir o Exemplo 2.
+           - Exemplo 1: "Houve condenação por honorários sucumbenciais acima de R$1500"
+           - Exemplo 2: "Não houve condenação por honorários sucumbenciais acima de R$1500"
+        5. Aplicação de Normativas Específicas:
+           - Verificar se existe aplicação de portaria, caso seja aplicável ao caso, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2. Não apresente justificativas do porque.
+           - Exemplo 1: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, III."
+           - Exemplo 2: "NÃO APLICAÇÃO DA PORTARIA 01/2017."
+        6. Direcionamentos Finais:
+           - Se existe aplicação de portaria, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2.
+           - Exemplo 1: "VERIFICAR A NECESSIDADE DE ENCAMINHAR OFÍCIO À SESA, E APÓS, ARQUIVAR A PASTA."
+           - Exemplo 2: "Encaminhe-se para análise e elaboração de contestação e recurso."
+
+        Orientações Gerais:
+        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
+        - Utilize o modelo acima como base para criar sentenças adequadas ao caso apresentado.
+        """
+            ]
+        }
+    }
+}
+
+
+TEMPLATE_SENTENCA_INSUMOS = {
+    "header": "# Modelo para elaboração de sentença judicial sobre concessão de insumos de atenção básica à saúde.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Sentença' refere-se à primeira seção da sentença.",
+        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Sentença' indica a primeira subseção da seção 2.",
+        "Use subsubseções quando necessário para detalhar informações complementares.",
+        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": (
+                "Elabore um despacho sobre uma sentença judicial para concessão de insumos de atenção básica à saúde"
+                "baseando-se nos dados fornecidos e na estrutura descrita abaixo. "
+                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
+                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
+            ),
+            "elements": [
+                """
+        Estrutura do Despacho:
+        1. Identificação do Despacho:
+           - Inicie com "R.H.".
+        2. Decisão sobre o Pleito:
+           - Julgue procedente ou parcialmente procedente o pleito autoral com resolução de mérito.
+           - Exemplo: "TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, CONFIRMANDO A TUTELA ANTECIPATÓRIA PARA O FORNECIMENTO DE..."
+        3. Listagem dos insumos de atenção básica:
+           - Liste os insumos de atenção básica à saúde e os detalhes informados.
+        3. Danos Morais:
+           - Indicar se há ou não pedido de condenação por danos morais.
+           - Exemplo: "SEM CONDENAÇÃO EM DANOS MORAIS."
+        4. Custas e Honorários:
+           - Verificar se existe condenação por honorários acima de R$1500 e em caso positivo seguir conforme o exemplo 1, caso contrário, seguir o Exemplo 2.
+           - Exemplo 1: "Houve condenação por honorários sucumbenciais acima de R$1500"
+           - Exemplo 2: "Não houve condenação por honorários sucumbenciais acima de R$1500"
+        5. Aplicação de Normativas Específicas:
+           - Verificar se existe aplicação de portaria, caso seja aplicável ao caso, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2. Não apresente justificativas do porque.
+           - Exemplo 1: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, V."
+           - Exemplo 2: "NÃO APLICAÇÃO DA PORTARIA 01/2017."
+        6. Direcionamentos Finais:
+           - Se existe aplicação de portaria, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2.
+           - Exemplo 1: "VERIFICAR A NECESSIDADE DE ENCAMINHAR OFÍCIO À SESA, E APÓS, ARQUIVAR A PASTA."
+           - Exemplo 2: "Encaminhe-se para análise e elaboração de contestação e recurso."
+
+        Orientações Gerais:
+        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
+        - Utilize o modelo acima como base para criar sentenças adequadas ao caso apresentado.
+        """
+            ]
+        }
+    }
+}
+
+
 TEMPLATE_SENTENCA_UNIFICADA = {
     "header": "# Modelo para elaboração de sentença judicial sobre concessão de cirurgias, exames ou consultas médicas.",
     "instructions": [
@@ -14,11 +224,11 @@ TEMPLATE_SENTENCA_UNIFICADA = {
                 "Elabore um despacho a respeito de uma sentença para concessão de cirurgias, exames ou consultas médicas, "
                 "baseando-se nos dados fornecidos e na estrutura descrita abaixo. "
                 "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo."
+                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
             ),
             "elements": [
                 """
-        Estrutura da Sentença:
+        Estrutura do Despacho:
         1. Identificação do Despacho:
            - Inicie com "R.H.".
         2. Decisão sobre o Pleito:
@@ -26,21 +236,21 @@ TEMPLATE_SENTENCA_UNIFICADA = {
            - Exemplo: "TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA."
         3. Especificação:
            - Ajuste conforme o tipo de sentença:
-             - *Para cirurgias*: Informe o procedimento a ser realizado e quaisquer detalhes relevantes.
+             - Para cirurgias: Informe o procedimento a ser realizado e quaisquer detalhes relevantes.
                - Exemplo: "REALIZAÇÃO DE [nome do procedimento cirúrgico]."
-             - *Para exames*: Informe os exames a serem realizados e quaisquer detalhes relevantes.
+             - Para exames: Informe os exames a serem realizados e quaisquer detalhes relevantes.
                - Exemplo: "DETERMINA-SE O FORNECIMENTO DE EXAMES LABORATORIAIS, [informar os exames encontrados]."
-             - *Para consultas*: Especificar a especialidade médica e qualquer detalhe relevante.
+             - Para consultas: Especificar a especialidade médica e qualquer detalhe relevante.
                - Exemplo: "CONSULTA MÉDICA [especialidade médica]."
         4. Danos Morais:
            - Indicar se há ou não pedido de condenação por danos morais.
            - Exemplo: "AUSÊNCIA DE PEDIDO DE DANOS MORAIS."
         5. Condenação por honorários:
-           - Verificar se existe condenação por honorários, e em caso positivo seguir conforme o exemplo 1, caso contrário, seguir o Exemplo 2.
-           - Exemplo 1: "Houve condenação por honorários sucumbenciais"
-           - Exemplo 2: "Não houve condenação por sucumbenciais"
+           - Verificar se existe condenação por honorários acima de R$1500, e em caso positivo seguir conforme o exemplo 1, caso contrário, seguir o Exemplo 2.
+           - Exemplo 1: "Houve condenação por honorários sucumbenciais acima de R$1500"
+           - Exemplo 2: "Não houve condenação por honorários sucumbenciais acima de R$1500"
         5. Aplicação de Normativas Específicas:
-           - Verificar se existe aplicação de portaria, caso seja aplicável ao caso, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2.
+           - Verificar se existe aplicação de portaria, caso seja aplicável ao caso, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2. Não apresente justificativas do porque.
            - Exemplo 1: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II."
            - Exemplo 2: "NÃO APLICAÇÃO DA PORTARIA 01/2017."
         6. Direcionamentos Finais:
@@ -57,62 +267,6 @@ TEMPLATE_SENTENCA_UNIFICADA = {
     }
 }
 
-
-'''
-TEMPLATE_sentenca_CONSULTAS_EXAMES_PROCEDIMENTOS = {
-    "header": "# Modelo para elaboração de despacho judicial para concessão de consultas, exames, procedimentos e tratamentos multidisciplinares.",
-    "instructions": [
-        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Decisão' refere-se à primeira seção do despacho.",
-        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Decisão' indica a primeira subseção da seção 2.",
-        "Use subsubseções quando necessário para detalhar informações complementares.",
-        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
-    ],
-    "template": {
-        "Texto Completo": {
-            "description": (
-                "Elabore um despacho judicial para concessão de consultas, exames, procedimentos (cirúrgicos ou não) "
-                "e tratamentos multidisciplinares, baseando-se nas informações fornecidas no contexto. "
-                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo."
-            ),
-            "elements": [
-                """
-        Estrutura do Despacho:
-        1. Identificação do Despacho:
-           Inicie com a abreviação "R.H." para indicar a abertura do despacho.
-        2. Sentença e Mérito:
-           - Avalie se há sentença do mérito e decisão procedente sobre o pleito autoral.
-           - Descreva a determinação da sentença.
-           - Exemplo: "TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO."
-        3. Determinação de Consultas, Exames e Procedimentos:
-           - Indique o tipo de consulta, exame ou procedimento requerido, incluindo cirúrgicos ou não.
-           - Exemplo: "DETERMINA A REALIZAÇÃO DE EXAME DE RESSONÂNCIA MAGNÉTICA E CONSULTA COM ESPECIALISTA."
-        4. Tratamentos Multidisciplinares:
-           - Caso aplicável, indique que foi solicitado tratamento multidisciplinar.
-           - Exemplo: "DETERMINA O INÍCIO DE TRATAMENTO MULTIDISCIPLINAR INCLUINDO SESSÕES DE FONOAUDIOLOGIA E PILATES."
-        5. Danos Morais:
-           - Indique se há ou não condenação em danos morais.
-           - Exemplo: "AUSÊNCIA DE CONDENAÇÃO EM DANOS MORAIS."
-        6. Custas e Honorários:
-           - Especifique, de acordo com os dados de contexto, a existência ou não de custas e honorários.
-           - Exemplo Negativo: "SEM CUSTAS NEM HONORÁRIOS."
-           - Exemplo Positivo: "HOUVE CONDENAÇÂO POR HONORÁRIOS."
-        7. Aplicação de Normativas Específicas:
-           - Inclua que aqui, de acordo com os dados de contexto, se foi verificada a aplicação da PORTARIA 01/2017, ART. 1º, artigo II. Sem justificar.
-           - Exemplo positivo: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II."
-           - Exemplo negativo: "NÃO SE APLICA A PORTARIA 01/2017."
-        8. Direcionamentos Finais:
-           - Apenas escrever: "VERIFICAR A NECESSIDADE DE ENCAMINHAR OFÍCIO À SESA, E APÓS, ARQUIVAR A PASTA."
-
-        Orientações Gerais:
-        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
-        - Utilize uma linguagem formal e técnica adequada para um contexto jurídico.
-        """
-            ]
-        }
-    }
-}
-'''
 
 
 TEMPLATE_MEDICAMENTO = {
@@ -148,248 +302,9 @@ TEMPLATE_MEDICAMENTO = {
 }
 
 
-TEMPLATE_SENTENCA_MEDICAMENTO = {
-    "header": "# Modelo para elaboração de sentença judicial sobre fornecimento de medicamentos.",
-    "instructions": [
-        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Sentença' refere-se à primeira seção da sentença.",
-        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Sentença' indica a primeira subseção da seção 2.",
-        "Use subsubseções quando necessário para detalhar informações complementares.",
-        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
-    ],
-    "template": {
-        "Texto Completo": {
-            "description": (
-                "Elabore uma sentença judicial para concessão de medicamentos, "
-                "baseando-se nos dados fornecidos e na estrutura descrita abaixo. "
-                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
-            ),
-            "elements": [
-                """
-        Estrutura da Sentença:
-        1. Identificação do Despacho:
-           - Inicie com "R.H.".
-        2. Decisão sobre o Pleito:
-           - Julgue procedente ou improcedente o pleito autoral com resolução de mérito.
-           - Ratifique ou não a decisão antecipatória de tutela previamente concedida.
-           - Exemplo: "TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA."
-        3. Especificação do Medicamento:
-           - Informe o medicamento e detalhes relevantes.
-           - Exemplo: "PARA O FORNECIMENTO DO MEDICAMENTO QUETIAPINA 100MG, REGISTRADO NA ANVISA."
-        4. Aplicação de Normativas Específicas:
-           - Informar que a portaria não é aplicável nesse caso.
-           - Exemplo: "NÃO SE APLICA A PORTARIA 01/2017."
-        5. Danos Morais:
-           - Indicar se há ou não pedido de indenização por danos morais.
-           - Exemplo: "AUSÊNCIA DE DANO MORAL."
-        6. Direcionamentos Processuais:
-           - Definir medidas processuais, como não interposição de recurso ou direcionamento para órgão responsável.
-           - Exemplo: "OPINA-SE PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE RECURSO."
-        7. Direcionamentos Finais:
-           - Encerrar o processo com as ações necessárias, conforme o texto de exemplo.
-           - Exemplo: "ARQUIVAR A PASTA."
-
-        Orientações Gerais:
-        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
-        - Utilize o modelo acima como base para criar sentenças adequadas ao caso apresentado.
-        """
-            ]
-        }
-    }
-}
-
-
-TEMPLATE_SENTENCA_CONSULTA = {
-    "header": "# Modelo para elaboração de sentença judicial sobre realização de consultas médicas.",
-    "instructions": [
-        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Sentença' refere-se à primeira seção da sentença.",
-        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Sentença' indica a primeira subseção da seção 2.",
-        "Use subsubseções quando necessário para detalhar informações complementares.",
-        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
-    ],
-    "template": {
-        "Texto Completo": {
-            "description": (
-                "Elabore uma sentença judicial para concessão de consultas médicas, "
-                "baseando-se nos dados fornecidos e na estrutura descrita abaixo. "
-                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo.  Não fornecer nomes das pessoas envolvidas."
-            ),
-            "elements": [
-                """
-        Estrutura da Sentença:
-        1. Identificação do Despacho:
-           - Inicie com "R.H.".
-        2. Decisão sobre o Pleito:
-           - Julgue procedente ou parcialmente procedente o pleito autoral com resolução de mérito.
-           - Especificar a especialidade médica.
-           - Exemplo: "TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, DETERMINANDO A REALIZAÇÃO DE CONSULTA MÉDICA COM [ESPECIALIDADE]."
-        3. Aplicação de Normativas Específicas:
-           - Informar portaria aplicável ao caso.
-           - Exemplo: "APLICAÇÃO DA PORTARIA 02/2018, ART. 3º, INCISO IV."
-        4. Danos Morais:
-           - Indicar se há ou não pedido de indenização por danos morais, conforme exemplo.
-           - Exemplo: "SEM CONDENAÇÃO EM DANOS MORAIS."
-        5. Direcionamentos Processuais:
-           - Definir medidas processuais, como não interposição de recurso ou direcionamento para órgãos responsáveis.
-           - Exemplo: "RECOMENDA-SE A NÃO INTERPOSIÇÃO DE RECURSO."
-        6. Direcionamentos Finais:
-           - Encerrar o processo com as ações necessárias, conforme o texto de exemplo.
-           - Exemplo: "ARQUIVAR O PROCESSO."
-
-        Orientações Gerais:
-        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
-        - Utilize o modelo acima como base para criar sentenças adequadas ao caso apresentado.
-        """
-            ]
-        }
-    }
-}
-
-
-TEMPLATE_SENTENCA_INTERNACAO = {
-    "header": "# Modelo para elaboração de sentença judicial sobre concessão de internação hospitalar.",
-    "instructions": [
-        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Sentença' refere-se à primeira seção da sentença.",
-        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Sentença' indica a primeira subseção da seção 2.",
-        "Use subsubseções quando necessário para detalhar informações complementares.",
-        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
-    ],
-    "template": {
-        "Texto Completo": {
-            "description": (
-                "Elabore uma sentença judicial para concessão de internação hospitalar, "
-                "baseando-se nos dados fornecidos e na estrutura descrita abaixo. "
-                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
-            ),
-            "elements": [
-                """
-        Estrutura da Sentença:
-        1. Identificação do Despacho:
-           - Inicie com "R.H.".
-        2. Decisão sobre o Pleito:
-           - Julgue procedente ou parcialmente procedente o pleito autoral com resolução de mérito.
-           - Informe o tipo de internação ou leito determinado 
-           - Exemplo: "TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, CONFIRMANDO A TUTELA ANTECIPATÓRIA PARA [tipo de internação]."
-        3. Danos Morais:
-           - Indicar se há ou não pedido de condenação por danos morais.
-           - Exemplo: "SEM CONDENAÇÃO EM DANOS MORAIS."
-        4. Custas e Honorários:
-           - Indicar se há isenção ou obrigação de pagamento de custas e honorários.
-           - Exemplo: "SEM CUSTAS NEM HONORÁRIOS ADVOCATÍCIOS."
-        5. Aplicação de Normativas Específicas:
-           - Informar portaria aplicável ao caso.
-           - Exemplo: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, INCISO II."
-        6. Direcionamentos Finais:
-           - Encerrar o processo com as ações necessárias.
-           - Exemplo: "ARQUIVAR O PROCESSO."
-
-        Orientações Gerais:
-        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
-        - Utilize o modelo acima como base para criar sentenças adequadas ao caso apresentado.
-        """
-            ]
-        }
-    }
-}
-
-TEMPLATE_SENTENCA_EXAMES = {
-    "header": "# Modelo para elaboração de sentença judicial sobre concessão de exames médicos.",
-    "instructions": [
-        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Sentença' refere-se à primeira seção da sentença.",
-        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Sentença' indica a primeira subseção da seção 2.",
-        "Use subsubseções quando necessário para detalhar informações complementares.",
-        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
-    ],
-    "template": {
-        "Texto Completo": {
-            "description": (
-                "Elabore uma sentença judicial para concessão de exames médicos, "
-                "baseando-se nos dados fornecidos e na estrutura descrita abaixo. "
-                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
-            ),
-            "elements": [
-                """
-        Estrutura da Sentença:
-        1. Identificação do Despacho:
-           - Inicie com "R.H.".
-        2. Decisão sobre o Pleito:
-           - Julgue procedente ou parcialmente procedente o pleito autoral com resolução de mérito.
-           - Exemplo: "TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA."
-        3. Especificação dos Exames Médicos:
-           - Informe os exames a serem realizados e quaisquer detalhes relevantes.
-           - Exemplo: "DETERMINA-SE O FORNECIMENTO DE EXAMES LABORATORIAIS, INCLUINDO HEMOGRAMA COMPLETO E FUNÇÃO RENAL."
-        4. Danos Morais:
-           - Indicar se há ou não pedido de condenação por danos morais.
-           - Exemplo: "AUSÊNCIA DE DANO MORAL."
-        5. Aplicação de Normativas Específicas:
-           - Informar portaria aplicável ao caso.
-           - Exemplo: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, I."
-        6. Direcionamentos Finais:
-           - Definir medidas processuais, como não interposição de recurso ou direcionamento para órgãos responsáveis.
-           - Exemplo: "ARQUIVAR O PROCESSO."
-
-        Orientações Gerais:
-        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
-        - Utilize o modelo acima como base para criar sentenças adequadas ao caso apresentado.
-        """
-            ]
-        }
-    }
-}
-
-
-TEMPLATE_SENTENCA_CIRURGIA = {
-    "header": "# Modelo para elaboração de sentença judicial sobre concessão de cirurgias.",
-    "instructions": [
-        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Sentença' refere-se à primeira seção da sentença.",
-        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Sentença' indica a primeira subseção da seção 2.",
-        "Use subsubseções quando necessário para detalhar informações complementares.",
-        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
-    ],
-    "template": {
-        "Texto Completo": {
-            "description": (
-                "Elabore uma sentença judicial para concessão de cirurgias, "
-                "baseando-se nos dados fornecidos e na estrutura descrita abaixo. "
-                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
-            ),
-            "elements": [
-                """
-        Estrutura da Sentença:
-        1. Identificação do Despacho:
-           - Inicie com "R.H.".
-        2. Decisão sobre o Pleito:
-           - Julgue procedente ou parcialmente procedente o pleito autoral com resolução de mérito.
-           - Exemplo: "TRATA-SE DE SENTENÇA JULGANDO PROCEDENTE O PLEITO AUTORAL, COM RESOLUÇÃO DO MÉRITO, RATIFICANDO A DECISÃO ANTECIPATÓRIA DE TUTELA ANTERIORMENTE CONCEDIDA."
-        3. Especificação da Cirurgia:
-           - Informe a cirurgia a ser realizada e quaisquer detalhes relevantes.
-           - Exemplo: "REALIZAÇÃO DE CIRURGIA BARIÁTRICA."
-        4. Danos Morais:
-           - Indicar se há ou não pedido de condenação por danos morais.
-           - Exemplo: "AUSÊNCIA DE PEDIDO DE DANOS MORAIS."
-        5. Aplicação de Normativas Específicas:
-           - Informar portaria aplicável ao caso.
-           - Exemplo: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II."
-        6. Direcionamentos Finais:
-           - Definir medidas processuais, como arquivamento ou outras providências necessárias.
-           - Exemplo: "ARQUIVAR O PROCESSO."
-
-        Orientações Gerais:
-        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
-        - Utilize o modelo acima como base para criar sentenças adequadas ao caso apresentado.
-        """
-            ]
-        }
-    }
-}
-
 
 TEMPLATE_DECISAO_INTERNACAO = {
-    "header": "# Modelo para elaboração de decisão interlocutória sobre fornecimento de leitos de UTI.",
+    "header": "# Modelo para elaboração de despacho sobre udecisão interlocutória para internação em leito hospitalar especializado.",
     "instructions": [
         "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Decisão' refere-se à primeira seção da decisão.",
         "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Decisão' indica a primeira subseção da seção 2.",
@@ -399,31 +314,128 @@ TEMPLATE_DECISAO_INTERNACAO = {
     "template": {
         "Texto Completo": {
             "description": (
-                "Elabore uma decisão interlocutória para concessão de internação hospitalar, "
+                "Elabore um despacho sobre uma  decisão interlocutória para concessão de internação em leito hospitalar especializado, "
                 "baseando-se nos dados fornecidos e nos exemplos de decisões anteriores. "
                 "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo."
+                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
             ),
             "elements": [
                 """
-        Estrutura da Decisão:
+        Estrutura do Despacho:
         1. Identificação do Despacho:
            - Inicie com "R.H.".
         2. Decisão sobre o Pleito:
            - Mencione a concessão da antecipação dos efeitos da tutela. Não precisa justificar, nem mesmo mostrar processos anteriores. Não mencionar nada sobre laudos.
            - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DE LEITO DE UTI."
-        3. Detalhes do Caso:
-           - Informe o tipo de prioridade (I, II ou III), a ausência ou presença de pedido de condenação em danos morais.
-        4. Aplicação de Normativas Específicas:
-           - Informar portaria aplicável ao caso.
-           - Exemplo: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2º I E II."
-        5. Direcionamentos Processuais:
-           - Sugira medidas processuais como não interposição de defesa/recurso.
-           - Exemplo: "OPINA-SE PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO."
+        3. Detalhes sobre o leito:
+           - Informe os detalhes sobre a internação solicitada.
+        4. Danos Morais:
+           - Indicar se há ou não pedido de condenação por danos morais.
+           - Exemplo: "AUSÊNCIA DE PEDIDO DE DANOS MORAIS."
+        5. Aplicação de Normativas Específicas:
+           - Verificar se existe aplicação de portaria, caso seja aplicável ao caso, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2. Não apresente justificativas do porque.
+           - Exemplo 1: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II."
+           - Exemplo 2: "NÃO APLICAÇÃO DA PORTARIA 01/2017."
         6. Direcionamentos Finais:
-           - Encerrar o processo, conforme o texto de exemplo.
-           - Exemplo: "ARQUIVAR A PASTA"
+           - Se existe aplicação de portaria, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2.
+           - Exemplo 1: "VERIFICAR A NECESSIDADE DE ENCAMINHAR OFÍCIO À SESA, E APÓS, ARQUIVAR A PASTA."
+           - Exemplo 2: "Encaminhe-se para análise e elaboração de contestação e recurso."
 
+        Orientações Gerais:
+        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
+        - Utilize exemplos como modelo para criar novos despachos adequados ao caso apresentado.
+        """
+            ]
+        }
+    }
+}
+
+
+TEMPLATE_DECISAO_COMPOSTOS = {
+    "header": "# Modelo para elaboração de decisão interlocutória sobre fornecimento de compostos alimentares e dietas especiais.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Decisão' refere-se à primeira seção da decisão.",
+        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Decisão' indica a primeira subseção da seção 2.",
+        "Use subsubseções quando necessário para detalhar informações complementares.",
+        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": (
+                "Elabore um despacho sobre uma decisão interlocutória para concessão de compostos alimentares e dietas especiais, "
+                "baseando-se nos dados fornecidos e nos exemplos de decisões anteriores. "
+                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
+                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
+            ),
+            "elements": [
+                """
+        Estrutura do Despacho:
+        1. Identificação do Despacho:
+           - Inicie com "R.H.".
+        2. Decisão sobre o Pleito:
+           - Mencione a concessão da antecipação dos efeitos da tutela. Não precisa justificar, nem mesmo mostrar processos anteriores. Não mencionar nada sobre laudos.
+           - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DE LEITO DE UTI."
+        3. Danos Morais:
+           - Indicar se há ou não pedido de condenação por danos morais.
+           - Exemplo: "AUSÊNCIA DE PEDIDO DE DANOS MORAIS."
+        4. Aplicação de Normativas Específicas:
+           - Verificar se existe aplicação de portaria, caso seja aplicável ao caso, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2. Não apresente justificativas do porque.
+           - Exemplo 1: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, III."
+           - Exemplo 2: "NÃO APLICAÇÃO DA PORTARIA 01/2017."
+        5. Direcionamentos Finais:
+           - Se existe aplicação de portaria, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2.
+           - Exemplo 1: "VERIFICAR A NECESSIDADE DE ENCAMINHAR OFÍCIO À SESA, E APÓS, ARQUIVAR A PASTA."
+           - Exemplo 2: "Encaminhe-se para análise e elaboração de contestação e recurso."
+        Orientações Gerais:
+        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
+        - Utilize exemplos como modelo para criar novos despachos adequados ao caso apresentado.
+        """
+            ]
+        }
+    }
+}
+
+
+
+
+
+TEMPLATE_DECISAO_INSUMOS = {
+    "header": "# Modelo para elaboração de decisão interlocutória sobre fornecimento de insumos de atenção básica à saúde.",
+    "instructions": [
+        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Decisão' refere-se à primeira seção da decisão.",
+        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Decisão' indica a primeira subseção da seção 2.",
+        "Use subsubseções quando necessário para detalhar informações complementares.",
+        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": (
+                "Elabore um despacho sobre uma decisão interlocutória para concessão de insumos de atenção básica à saúde "
+                "baseando-se nos dados fornecidos e nos exemplos de decisões anteriores. "
+                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
+                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
+            ),
+            "elements": [
+                """
+        Estrutura do Despacho:
+        1. Identificação do Despacho:
+           - Inicie com "R.H.".
+        2. Decisão sobre o Pleito:
+           - Mencione a concessão da antecipação dos efeitos da tutela. Não precisa justificar, nem mesmo mostrar processos anteriores. Não mencionar nada sobre laudos.
+           - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DE FRALDAS GERIÁTRICAS."
+        3. Listagem dos insumos de atenção básica:
+           - Liste os insumos de atenção básica à saúde e os detalhes informados.
+        4. Danos Morais:
+           - Indicar se há ou não pedido de condenação por danos morais.
+           - Exemplo: "AUSÊNCIA DE PEDIDO DE DANOS MORAIS."
+        5. Aplicação de Normativas Específicas:
+           - Verificar se existe aplicação de portaria, caso seja aplicável ao caso, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2. Não apresente justificativas do porque.
+           - Exemplo 1: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, V."
+           - Exemplo 2: "NÃO APLICAÇÃO DA PORTARIA 01/2017."
+        6. Direcionamentos Finais:
+           - Se existe aplicação de portaria, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2.
+           - Exemplo 1: "VERIFICAR A NECESSIDADE DE ENCAMINHAR OFÍCIO À SESA, E APÓS, ARQUIVAR A PASTA."
+           - Exemplo 2: "Encaminhe-se para análise e elaboração de contestação e recurso."
         Orientações Gerais:
         - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
         - Utilize exemplos como modelo para criar novos despachos adequados ao caso apresentado.
@@ -445,184 +457,103 @@ TEMPLATE_DECISAO_MEDICAMENTO = {
     "template": {
         "Texto Completo": {
             "description": (
-                "Elabore uma decisão interlocutória para concessão de medicamentos, "
+                "Elabore um despacho sobre uma decisão interlocutória para concessão de medicamentos, "
                 "baseando-se nos dados fornecidos e nos exemplos de decisões anteriores. "
                 "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo."
+                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
             ),
             "elements": [
                 """
-        Estrutura da Decisão:
+        Estrutura do Despacho:
         1. Identificação do Despacho:
            - Inicie com "R.H.".
         2. Decisão sobre o Pleito:
            - Mencione a concessão da antecipação dos efeitos da tutela para fornecimento de medicamentos. Não precisa justificar ou mencionar processos anteriores ou laudos.
            - Informe o medicamento e quais são eles. Não precisa informar valores.
            - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR O FORNECIMENTO DE MEDICAMENTO [nome do medicamento]."
-        3. Aplicação de Normativas Específicas:
-           - Informar portaria aplicável ao caso.
-           - Exemplo: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, I C/C ART. 2º, I E II."
+        3. Danos Morais:
+           - Indicar se há ou não pedido de condenação por danos morais.
+           - Exemplo: "AUSÊNCIA DE PEDIDO DE DANOS MORAIS."
+        4. Aplicação de Normativas Específicas:
+           - Verificar se existe aplicação de portaria, caso seja aplicável ao caso, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2. Não apresente justificativas do porque.
+           - Exemplo 1: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II."
+           - Exemplo 2: "NÃO APLICAÇÃO DA PORTARIA 01/2017, tendo em vista se tratar de medicamento."
+        5. Direcionamentos Finais:
+           - Se existe aplicação de portaria, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2.
+           - Exemplo 1: "VERIFICAR A NECESSIDADE DE ENCAMINHAR OFÍCIO À SESA, E APÓS, ARQUIVAR A PASTA."
+           - Exemplo 2: "Encaminhe-se para análise e elaboração de contestação e recurso."
+
+        Orientações Gerais:
+        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
+        - Utilize exemplos como modelo para criar novos despachos adequados ao caso apresentado.
+        """
+            ]
+        }
+    }
+}
+
+
+
+TEMPLATE_DECISAO_UNIFICADA = {
+    "header": "# Modelo para elaboração de decisão judicial sobre concessão de cirurgias, exames ou consultas médicas.",
+    "instructions": [
+        "Este template unificado abrange decisões para concessão de cirurgias, exames e consultas médicas.",
+        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação da Decisão' refere-se à primeira seção da decisão.",
+        "Identifique automaticamente o tipo de decisão com base nos dados fornecidos e ajuste o texto conforme o contexto.",
+        "Use subsubseções quando necessário para detalhar informações complementares.",
+        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
+    ],
+    "template": {
+        "Texto Completo": {
+            "description": (
+                "Elabore um despacho a respeito de uma decisão interlocutória para concessão de cirurgias, exames ou consultas médicas, "
+                "baseando-se nos dados fornecidos e na estrutura descrita abaixo. "
+                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
+                "Evite o uso de todas as letras em maiúsculo. Não fornecer nomes das pessoas envolvidas."
+            ),
+            "elements": [
+                """
+        Estrutura do Despacho:
+        1. Identificação do Despacho:
+           - Inicie com "R.H.".
+        2. Decisão sobre o Pleito::
+           - Ajuste conforme o tipo de decisão. Não precisa justificar ou mencionar processos anteriores ou laudos: 
+              - Para cirurgias: Mencione a concessão ou indeferimento da antecipação dos efeitos da tutela para realização de cirurgia. Informe o procedimento específico e quaisquer detalhes relevantes.
+                - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO DE CIRURGIA [NOME DA CIRURGIA]."
+             - Para exames: Mencione a concessão da antecipação dos efeitos da tutela para a realização dos exames médicos requeridos. Informe os exames a serem realizados e quaisquer detalhes relevantes.
+                - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO De EXAME [especificar o exame]."
+            - Para consultas: Mencione a concessão da antecipação dos efeitos da tutela para a realização dos exames médicos requeridos. Informe a especialidade da consulta e qualquer detalhe adicional relevante.
+                - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO DE CONSULTA MÉDICA [especificar a consulta]."
+        3. Especificação::
+           - Ajuste conforme o tipo de decisão:
+             - Para cirurgias: Especifique o procedimento cirúrgico e detalhes relevantes.
+               - Exemplo: "DETERMINO A REALIZAÇÃO DE [nome do procedimento cirúrgico]."
+             - Para exames: Especifique os exames a serem realizados e detalhes relevantes.
+               - Exemplo: "DETERMINO A REALIZAÇÃO DE [exames específicos]."
+             - Para consultas: Indique a especialidade médica e detalhes relevantes.
+               - Exemplo: "DETERMINO A CONSULTA NA ESPECIALIDADE [nome da especialidade]."
         4. Danos Morais:
            - Indicar se há ou não pedido de condenação por danos morais.
-           - Exemplo: "AUSÊNCIA DE DANO MORAL."
-        5. Direcionamentos Processuais:
-           - Sugira medidas processuais como não interposição de defesa/recurso.
-           - Exemplo: "OPINA-SE PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO."
+           - Exemplo: "AUSÊNCIA DE PEDIDO DE DANOS MORAIS."
+        5. Aplicação de Normativas Específicas:
+           - Verificar se existe aplicação de portaria, caso seja aplicável ao caso, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2. Não apresente justificativas do porque.
+           - Exemplo 1: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II."
+           - Exemplo 2: "NÃO APLICAÇÃO DA PORTARIA 01/2017."
         6. Direcionamentos Finais:
-           - Encerrar o processo, conforme o texto de exemplo.
-           - Exemplo: "ARQUIVAR A PASTA."
-
+           - Se existe aplicação de portaria, seguir conforme o exemplo 1, caso não, seguir o Exemplo 2.
+           - Exemplo 1: "VERIFICAR A NECESSIDADE DE ENCAMINHAR OFÍCIO À SESA, E APÓS, ARQUIVAR A PASTA."
+           - Exemplo 2: "Encaminhe-se para análise e elaboração de contestação e recurso."
+        
         Orientações Gerais:
-        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
-        - Utilize exemplos como modelo para criar novos despachos adequados ao caso apresentado.
+        - Redija o texto utilizando linguagem formal e técnica, preservando a clareza e coerência.
+        - Detecte automaticamente o tipo de decisão com base nos dados fornecidos e ajuste o texto conforme o tipo identificado.
+        - Utilize o modelo acima como base para criar decisões adequadas ao caso apresentado.
         """
             ]
         }
     }
 }
 
-
-TEMPLATE_DECISAO_EXAME = {
-    "header": "# Modelo para elaboração de decisão interlocutória sobre realização de exames médicos.",
-    "instructions": [
-        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Decisão' refere-se à primeira seção da decisão.",
-        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Decisão' indica a primeira subseção da seção 2.",
-        "Use subsubseções quando necessário para detalhar informações complementares.",
-        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
-    ],
-    "template": {
-        "Texto Completo": {
-            "description": (
-                "Elabore uma decisão interlocutória para a realização de exames médicos, "
-                "baseando-se nos dados fornecidos e nos exemplos de decisões anteriores. "
-                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo."
-            ),
-            "elements": [
-                """
-        Estrutura da Decisão:
-        1. Identificação do Despacho:
-           - Inicie com "R.H.".
-        2. Decisão sobre o Pleito:
-           - Mencione a concessão da antecipação dos efeitos da tutela para a realização dos exames médicos requeridos. Não precisa justificar ou mencionar processos anteriores ou laudos.
-           - Informe os exames a serem realizados e quaisquer detalhes relevantes.
-           - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO De EXAME [especificar o exame]."
-        3. Aplicação de Normativas Específicas:
-           - Informar portaria aplicável ao caso.
-           - Exemplo: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2º, I E II."
-        4. Danos Morais:
-           - Indicar se há ou não pedido de indenização por danos morais.
-           - Exemplo: "AUSÊNCIA DE PEDIDO DE INDENIZAÇÃO POR DANOS MORAIS."
-        5. Direcionamentos Processuais:
-           - Sugira medidas processuais como não interposição de defesa/recurso.
-           - Exemplo: "OPINA-SE PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO."
-        6. Direcionamentos Finais:
-           - Encerrar o processo, conforme o texto de exemplo.
-           - Exemplo: "ARQUIVAR A PASTA."
-
-        Orientações Gerais:
-        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
-        - Utilize exemplos como modelo para criar novos despachos adequados ao caso apresentado.
-        """
-            ]
-        }
-    }
-}
-
-
-TEMPLATE_DECISAO_CIRURGIA = {
-    "header": "# Modelo para elaboração de decisão interlocutória sobre realização de cirurgia.",
-    "instructions": [
-        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Decisão' refere-se à primeira seção da decisão.",
-        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Decisão' indica a primeira subseção da seção 2.",
-        "Use subsubseções quando necessário para detalhar informações complementares.",
-        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
-    ],
-    "template": {
-        "Texto Completo": {
-            "description": (
-                "Elabore uma decisão interlocutória para a realização de cirurgia, "
-                "baseando-se nos dados fornecidos e nos exemplos de decisões anteriores. "
-                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo."
-            ),
-            "elements": [
-                """
-        Estrutura da Decisão:
-        1. Identificação do Despacho:
-           - Inicie com "R.H.".
-        2. Decisão sobre o Pleito:
-           - Mencione a concessão ou indeferimento da antecipação dos efeitos da tutela para realização de cirurgia. Não precisa justificar ou mencionar processos anteriores ou laudos.
-           - Informe o procedimento específico e quaisquer detalhes relevantes.
-           - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO DE CIRURGIA [NOME DA CIRURGIA]."
-        3. Aplicação de Normativas Específicas:
-           - Informar portaria aplicável ao caso.
-           - Exemplo: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2º, I E II."
-        4. Danos Morais:
-           - Indicar se há ou não pedido de indenização por danos morais.
-           - Exemplo: "AUSÊNCIA DE PEDIDO DE INDENIZAÇÃO POR DANOS MORAIS."
-        5. Direcionamentos Processuais:
-           - Sugira medidas processuais como não interposição de defesa/recurso.
-           - Exemplo: "OPINA-SE PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO."
-        6. Direcionamentos Finais:
-           - Encerrar o processo, conforme o texto de exemplo.
-           - Exemplo: "ARQUIVAR A PASTA."
-
-        Orientações Gerais:
-        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
-        - Utilize exemplos como modelo para criar novos despachos adequados ao caso apresentado.
-        """
-            ]
-        }
-    }
-}
-
-TEMPLATE_DECISAO_CONSULTA = {
-    "header": "# Modelo para elaboração de decisão interlocutória sobre realização de consultas médicas.",
-    "instructions": [
-        "Cada número abaixo corresponde a uma seção principal. Exemplo: '1. Identificação do Tipo de Decisão' refere-se à primeira seção da decisão.",
-        "Cada número seguido de um ponto refere-se a uma subseção. Exemplo: '2.1 Objeto da Decisão' indica a primeira subseção da seção 2.",
-        "Use subsubseções quando necessário para detalhar informações complementares.",
-        "Siga rigorosamente a estrutura apresentada, mantendo o tom formal e técnico esperado em um contexto jurídico."
-    ],
-    "template": {
-        "Texto Completo": {
-            "description": (
-                "Elabore uma decisão interlocutória para a realização de consultas médicas, "
-                "baseando-se nos dados fornecidos e nos exemplos de decisões anteriores. "
-                "O texto deve ser apresentado em um único parágrafo, sem tópicos enumerados. "
-                "Evite o uso de todas as letras em maiúsculo."
-            ),
-            "elements": [
-                """
-        Estrutura da Decisão:
-        1. Identificação do Despacho:
-           - Inicie com "R.H.".
-        2. Decisão sobre o Pleito:
-           - Mencione a concessão da antecipação dos efeitos da tutela para realização da consulta médica solicitada. Não precisa justificar ou mencionar processos anteriores ou laudos.
-           - Informe a especialidade da consulta e qualquer detalhe adicional relevante.
-           - Exemplo: "TRATA-SE DE DECISÃO INTERLOCUTÓRIA CONCEDENDO A ANTECIPAÇÃO DOS EFEITOS DA TUTELA JURISDICIONAL PARA DETERMINAR A REALIZAÇÃO DE CONSULTA MÉDICA [CONSULTA COM NEUROLOGISTA OFERECIDA PELO SUS]."
-        3. Aplicação de Normativas Específicas:
-           - Informar portaria aplicável ao caso.
-           - Exemplo: "APLICAÇÃO DA PORTARIA 01/2017, ART. 1º, II C/C ART. 2º, I E II."
-        4. Danos Morais:
-           - Indicar se há ou não pedido de indenização por danos morais.
-           - Exemplo: "AUSÊNCIA DE PEDIDO DE INDENIZAÇÃO POR DANOS MORAIS."
-        5. Direcionamentos Processuais:
-           - Sugira medidas processuais como não interposição de defesa/recurso.
-           - Exemplo: "OPINA-SE PELA NÃO APRESENTAÇÃO/INTERPOSIÇÃO DE DEFESA/RECURSO."
-        6. Direcionamentos Finais:
-           - Encerrar o processo, conforme o texto de exemplo.
-           - Exemplo: "ARQUIVAR A PASTA."
-
-        Orientações Gerais:
-        - Redija o texto utilizando uma linguagem formal e técnica, preservando a clareza e coerência.
-        - Utilize exemplos como modelo para criar novos despachos adequados ao caso apresentado.
-        """
-            ]
-        }
-    }
-}
 
 
 TEMPLATE_DECISAO_INTERNACAO_Semportaria = {
@@ -643,7 +574,7 @@ TEMPLATE_DECISAO_INTERNACAO_Semportaria = {
             ),
             "elements": [
                 """
-        Estrutura da Decisão:
+        Estrutura do Despacho:
         
         1. Identificação do Despacho:
            - Inicie com "R.H." ou diretamente com a frase "TRATA-SE DE DECISÃO INTERLOCUTÓRIA..."
@@ -744,7 +675,7 @@ TEMPLATE_DECISAO_INTERNACAO3 = {
             ),
             "elements": [
                 """
-        Estrutura da Decisão:
+        Estrutura do Despacho:
         1. Identificação do Despacho:
            - Inicie com "R.H." ou diretamente com a frase "TRATA-SE DE DECISÃO INTERLOCUTÓRIA..."
         2. Decisão sobre o Pleito:

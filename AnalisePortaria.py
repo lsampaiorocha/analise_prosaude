@@ -33,9 +33,7 @@ class TipoDocumentoIndeterminadoException(Exception):
 # Define o caminho base como o diretório atual onde o script está sendo executado
 base_directory = os.getcwd()
 
-# Configuração da chave da API GPT
-env_path = os.path.join(base_directory, 'ambiente.env')
-load_dotenv(env_path)  # Carrega as variáveis de ambiente de .env
+load_dotenv()  # Carrega as variáveis de ambiente de .env
 
 #verifica se a chave do GPT foi encontrada
 api_key = os.environ.get('OPENAI_API_KEY')
@@ -74,6 +72,14 @@ def inicializa_dicionario():
     "respeita_valor_teto": None,
     #valor total do tratamento
     "valor_teto": None,
+    #houve extinção do processo
+    'houve_extincao': False,
+    #é uma decisão de cumprimento de sentença
+    'cumprimento_de_sentenca': False,
+    #houve o bloqueio de recursos ou contas
+    'bloqueio_de_recursos': False,
+    #é uma decisão monocrática
+    'monocratica': False,
     #medicamentos contidos na sentença
     "lista_medicamentos": [],
     #itens que não são medicamentos contidos na sentença...
@@ -140,10 +146,9 @@ def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True,
         if MedRobot:
             print("MedRobot está ativado.")
     
-    
     #realiza o preprocessamento e filtragem das paginas do pdf
     (filtered_pages, tipo_documento, custoresumo) = preprocessamento(caminho, models, Verbose=Verbose, TipoDocumento=TipoDocumento, Resumo=Resumo)        
-
+    
     if tipo_documento == "Indeterminado":
         raise TipoDocumentoIndeterminadoException("Não foi possível determinar o tipo de documento para a Análise")
   
@@ -152,25 +157,49 @@ def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True,
             print(f"Número de páginas após pré-processamento: {len(filtered_pages)}\n")
             print(f"Tipo de Documento em Análise: {tipo_documento}\n")
 
+        print(f"Número de páginas após pré-processamento: {len(filtered_pages)}\n")
+        print(f"Tipo de Documento em Análise: {tipo_documento}\n")
+
         # cria ids para as páginas, o que vai ser útil para gerenciar o banco de dados de vetores
         ids = [str(i) for i in range(1, len(filtered_pages) + 1)]
 
         #utiliza embeddings da OpenAI para o banco de vetores Chroma
         embeddings = OpenAIEmbeddings()
+        
+        
         docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024}) #a opção "hnsw:M": 1024 é importante para não ter problemas
-                
+        
+        
+        
+        """
+        
+        # Simula o comportamento do docsearch com uma única página (foi necessaria apos mudanca da logica de varias paginas para um unico resumo)
+        class SimpleDocSearch:
+            def __init__(self, documents):
+                self.documents = documents
+
+            def similarity_search(self, query, k=1):
+                # Retorna a única página, pois há apenas um resumo
+                return self.documents[:k]
+            
+            def as_retriever(self):
+                return self
+            
+            def with_config(self, **kwargs):
+                return self
+        """
+        
+        # Cria a instância do "docsearch" com a única página do resumo
+        #docsearch = SimpleDocSearch(filtered_pages)
+        
         #aplica o pipeline de análise apropriado ao tipo de documento
         resposta = AnalisePipeline(filtered_pages, docsearch, models, Verbose, MedRobot, TipoDocumento=tipo_documento, Resumo=Resumo, CustoResumo=custoresumo)
-
+    
         #apaga as entradas criadas no Chroma
-
         docsearch._collection.delete(ids=ids)
-        #docsearch.persist()  # salva quaisquer mudanças
-        #docsearch._collection.close()  # encerra a conexão
-        #docsearch.delete_collection() 
+        
         docsearch = None 
-        ids = [] 
-
+        #ids = [] 
 
         return resposta
     
@@ -200,6 +229,24 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
         resposta["tipo_documento"] = "Decisão Interlocutória"
     else:
         resposta["tipo_documento"] = TipoDocumento
+
+    #Verifica se houve extinção do processo, cumprimento de sentença ou bloqueio de recursos
+    regex_extincao = r"\*\*Houve a extinção do processo:\*\*\s*'?\s*(Sim|Não)\s*'?"
+    regex_cumprimento_sentenca = r"\*\*Trata-se de uma decisão de cumprimento de sentença:\*\*\s*'?\s*(Sim|Não)\s*'?"
+    regex_bloqueio_recursos = r"\*\*Trata-se de uma decisão de bloqueio de recursos ou contas:\*\*\s*'?\s*(Sim|Não)\s*'?"
+    regex_monocratica = r"\*\*Trata-se de um documento intitulado decisão monocrática:\*\*\s*'?\s*(Sim|Não)\s*'?"
+
+    # Buscar valores no resumo
+    extincao = re.search(regex_extincao, resposta["resumo"])
+    cumprimento_sentenca = re.search(regex_cumprimento_sentenca, resposta["resumo"])
+    bloqueio_recursos = re.search(regex_bloqueio_recursos, resposta["resumo"])
+    monocratica = re.search(regex_monocratica, resposta["resumo"])
+
+    # Converter os resultados em booleanos
+    resposta['houve_extincao'] = extincao.group(1) == "Sim" if extincao else False
+    resposta['cumprimento_de_sentenca'] = cumprimento_sentenca.group(1) == "Sim" if cumprimento_sentenca else False
+    resposta['bloqueio_de_recursos'] = bloqueio_recursos.group(1) == "Sim" if bloqueio_recursos else False
+    resposta['monocratica'] = monocratica.group(1) == "Sim" if monocratica else False
 
 
     if TipoDocumento == "Sentença":
@@ -238,7 +285,7 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
         if doutrosllm:
             #TODO: pensar uma dinamica para distinguir os outros proibidos e os aceitaveis
             if outrosregex:
-                outros = True   
+                outros = True
         
         #lista contendo os nomes de compostos alimentares obtidos da sentença
         (lalim, calim) = AnaliseAlimentares(docsearch, model=models['alimentares'], Verbose=Verbose, Resumo=Resumo)
@@ -321,13 +368,16 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
         
         
         #resultado da aplicação da portaria em seus 6 incisos
-        resposta['aplicacao_incisos'] = [False,
-            (resposta['internacao'] or resposta['possui_consulta']) and resposta['respeita_valor_teto'] and not resposta['condenacao_honorarios'] and not resposta['possui_outros_proibidos'],
-            resposta['lista_compostos'] and resposta['respeita_valor_teto'] and not resposta['condenacao_honorarios'] and not resposta['possui_outros_proibidos'],
-            False,
-            False,
-            False]
-
+        
+        if resposta['respeita_valor_teto'] and not resposta['condenacao_honorarios'] and not resposta['possui_outros_proibidos']:
+            resposta['aplicacao_incisos'] = [False,
+                (resposta['internacao'] or resposta['possui_consulta']),
+                bool(resposta['lista_compostos']),
+                False,
+                bool(resposta['lista_outros']),
+                False]
+        else:
+            resposta['aplicacao_incisos'] = (False, False, False, False, False, False)
 
         #custo total com LLMs
         soma_prompt = sum([cdoutros[0], cmeds[0], calim[0], chonor[0], CustoResumo[0], cinterna[0], cconsultas[0]])
@@ -339,18 +389,11 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
 
         if Verbose:
             exibe_dados(resposta)
-            #print(f"Custo com LLMs para Resumo: {"$ {:.4f}".format(CustoGpt4o(CustoResumo[0],CustoResumo[1]))}")
-            #print(f"Custo com LLMs para extração de medicamentos: {"$ {:.4f}".format(CustoGpt4o(cmeds[0],cmeds[1]))}")
-            #print(f"Custo com LLMs para detecção de outros itens: {"$ {:.4f}".format(CustoGpt4o(cdoutros[0],cdoutros[1]))}")
-            #print(f"Custo com LLMs para detecção de condenação por honorários: {"$ {:.4f}".format(CustoGpt4o(chonor[0],chonor[1]))}")
-            #print(f"Custo com LLMs para detecção de internação: {"$ {:.4f}".format(CustoGpt4o(cinterna[0],cinterna[1]))}")
-            #print(f"Custo total com LLMs: {"$ {:.4f}".format(resposta['custollm'])}")
     
     #Caso seja Decisão Interlocutória ou Petição Inicial
     else:
         
         #analisa se existe condenação por honorários na sentença
-        #(honor, chonor) = AnaliseHonorarios(docsearch, model=models['honorarios'], Verbose=Verbose, Resumo=Resumo)
         (honor, chonor) = (False, (0, 0))
         
         #analisa se existe pedido de internação em UTI
@@ -464,12 +507,16 @@ def AnalisePipeline(pages, docsearch, models, Verbose=False, MedRobot=True, Tipo
             })    
         
         #resultado da aplicação da portaria em seus 6 incisos
-        resposta['aplicacao_incisos'] = [False,
-            (resposta['internacao'] or resposta['possui_consulta']) and not resposta['possui_outros_proibidos'],
-            resposta['lista_compostos'] and not resposta['possui_outros_proibidos'],
-            False,
-            False,
-            False]
+        
+        if not resposta['possui_outros_proibidos']:
+            resposta['aplicacao_incisos'] = [False,
+                (resposta['internacao'] or resposta['possui_consulta']),
+                bool(resposta['lista_compostos']),
+                False,
+                bool(resposta['lista_outros']),
+                False]
+        else:
+            resposta['aplicacao_incisos'] = (False, False, False, False, False, False)
 
 
         #custo total com LLMs

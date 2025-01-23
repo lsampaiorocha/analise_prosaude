@@ -42,7 +42,7 @@ def preprocessamento(caminho, models, Verbose=False, TipoDocumento="Indeterminad
     custo = 0
         
     if Resumo or TipoDocumento == "Indeterminado":
-        print(f'Valor de models: {models}')
+        #print(f'Valor de models: {models}')
         
         (resumo, custo) = GeraResumo(pages, models['resumo'], api_key, Verbose=Verbose)
         
@@ -54,6 +54,8 @@ def preprocessamento(caminho, models, Verbose=False, TipoDocumento="Indeterminad
             arquivo.write(resumo)
         
         tipo_documento = ExtraiTipoDocumento(resumo)
+        
+        print(f"Tipo do documento {tipo_documento}")
        
         
     elif TipoDocumento == "Sentença":

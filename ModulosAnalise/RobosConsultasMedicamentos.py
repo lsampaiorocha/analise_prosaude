@@ -11,7 +11,12 @@ from selenium.webdriver.chrome.options import Options
 import time
 import os
 
+#webdriver-manager
+#from selenium.webdriver.chrome.service import Service
+#from selenium.webdriver.chrome.options import Options
+#from webdriver_manager.chrome import ChromeDriverManager
 
+"""
 def config_chrome():
     
     chrome_driver_path = r'chrome-win64\chrome.exe'
@@ -19,17 +24,26 @@ def config_chrome():
 
     # Configurar opções do ChromeDriver para executar em modo headless e desabilitar algumas funcionalidades de segurança
     chrome_options = Options()
+    chrome_options.binary_location = "/usr/bin/chromium"  # Localização do Chromium no contêiner
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-web-security")
     chrome_options.add_argument("--disable-features=IsolateOrigins,site-per-process")
     chrome_options.add_argument("--disable-site-isolation-trials")    
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--verbose")
+
+    
+    # Usar o webdriver-manager para baixar o ChromeDriver compatível
+    #service = Service(ChromeDriverManager().install())
 
     # Inicializar o WebDriver do Selenium com as opções configuradas
-    driver = webdriver.Chrome(options=chrome_options)
+    #driver = webdriver.Chrome(service=service, options=chrome_options)
     
     return driver
-
+"""
 
 # Função para extrair número do processo a partir da página de detalhes do medicamento
 def extract_process_number(page_source):
@@ -98,7 +112,7 @@ def check_anvisa_registration(anvisa_number,driver):
 def RoboGoogleAnvisa(lista_medicamentos):
     # Inicializar o drive
     #driver = config_chrome()
-    
+    """
     chrome_driver_path = r'chrome-win64\chrome.exe'
     os.environ["PATH"] += os.pathsep + chrome_driver_path
 
@@ -109,9 +123,27 @@ def RoboGoogleAnvisa(lista_medicamentos):
     chrome_options.add_argument("--disable-web-security")
     chrome_options.add_argument("--disable-features=IsolateOrigins,site-per-process")
     chrome_options.add_argument("--disable-site-isolation-trials")    
+    
 
     # Inicializar o WebDriver do Selenium com as opções configuradas
     driver = webdriver.Chrome(options=chrome_options)
+    """
+    
+    # Configurar opções do ChromeDriver para executar em modo headless e desabilitar algumas funcionalidades de segurança
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-web-security")
+    chrome_options.add_argument("--disable-features=IsolateOrigins,site-per-process")
+    chrome_options.add_argument("--disable-site-isolation-trials")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.binary_location = "/usr/bin/chromium"  # Local do Chromium no contêiner
+
+    # Inicializar o WebDriver do Selenium com as opções configuradas
+    driver = webdriver.Chrome(options=chrome_options)
+    
+    
     # Lista para armazenar os resultados
     results = list()
     # Loop através dos medicamentos
