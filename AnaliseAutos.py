@@ -4,7 +4,53 @@ import re
 import os
 import pdfplumber
 import csv
-from datetime import datetime
+
+from datetime import datetime, timedelta
+
+
+
+
+#Função principal que busca os nomes de documentos de interesse na lista interests e tenta encontrar o id de documentos na lista
+#caso existam
+def encontra_id_documento_analise(pdf_path,document_info,interests):
+    # Inicializa varávais para checar se o documento correto é realmente o selecionado
+    # pelo robô
+    analysed_ids = []
+    
+    # Captura os andamentos de interesse para a aplicação de portaria
+    # dado a lista de andamentos do processo
+    
+    try:
+        tipos_encontrados = CheckTypesOfInterest(document_info, interests)
+    except Exception as e:
+        print(f"Erro ao encontrar o documento para analise: {e}")
+        raise RuntimeError(f"Erro ao encontrar o documento para analise: {e}")
+
+    if not tipos_encontrados:
+        print("Nenhum tipo de interesse encontrado no documento fornecido.")
+        raise RuntimeError(f"Erro ao encontrar o documento para analise: Nenhum tipo de interesse encontrado no documento fornecido.")
+    
+    #print(tipos_encontrados)
+    # Seleciona o último ID de interesse para a análise de Aplicação 
+    # da portaaria  01/2017
+   
+    try:
+        selecao = select_id_to_analyze(tipos_encontrados,analysed_ids)
+    except Exception as e:
+        print(f"Erro ao encontrar o documento para analise: {e}")
+        raise RuntimeError(f"Erro ao encontrar o documento para analise: {e}")
+    
+    if selecao is not None:
+        id_selecionado,documento,tipo = selecao 
+        # Faz uma série de Checagens para validar que o documento selecionado é realmente o que o Robô
+        # necessita analisar
+        #id_revisto =  CheckPDFDocument(pdf_path,id_selecionado,tipo,documento,tipos_encontrados,contagem_peticoes,analysed_ids)
+        #print(f"Id Documento Selecionado: {id_revisto}")
+        #return id_revisto
+        return id_selecionado
+    else:
+        return None
+
 
 
 def extract_pages_to_check(pdf_path):
@@ -74,9 +120,145 @@ def extract_document_info_from_pages(pdf_path, pages_to_check):
 
 
 
+# Retorna uma lista com as informações de documentos que casam com os tipos de interesse (interests)
+def CheckTypesOfInterest(document_info, interests):
+    found_types = []
+    peticao_docs = []
+
+    # Define o período máximo permitido (últimos 60 dias)
+    periodo = datetime.now() - timedelta(days=60)
+    
+    
+    # Mapeamento de caracteres acentuados e suas versões sem acento
+    accent_map = str.maketrans(
+        "áàãâäéèêëíìîïóòõôöúùûüç",
+        "aaaaaeeeeiiiiooooouuuuc"
+    )
+    
+    # Gera expressões regulares que consideram a ausência de acentos
+    interest_patterns = [
+        re.compile(fr"\b{re.escape(interesse).translate(accent_map)}\b", re.IGNORECASE) 
+        for interesse in interests
+    ]
+
+    for info in document_info:
+        # Garantir que a tupla tem o formato esperado
+        if not isinstance(info, dict):
+            raise ValueError(f"Entrada inválida em document_info: {info}. Esperado um dicionário.")
+
+        id_doc = info.get("id_doc")
+        data_assinatura_str = info.get("dt_assinatura")
+        documento = info.get("nome")
+        tipo = info.get("tipo")
+
+        # Validação básica dos campos obrigatórios
+        if id_doc is None or data_assinatura_str is None or documento is None or tipo is None:
+            raise ValueError(f"Campos ausentes no dicionário: {info}")
+
+        """
+        # Converte a data de assinatura para datetime (se possível)
+        try:
+            data_assinatura = datetime.strptime(data_assinatura_str, "%d/%m/%Y")  # Formato esperado: DD/MM/YYYY
+        except ValueError:
+            print(f"Aviso: Data inválida no documento {id_doc} - {data_assinatura_str}")
+            continue  # Ignora documentos com datas inválidas
+
+        """
+        
+        # Converte a data de assinatura para datetime (se possível)
+        # Usa a função parse_data_assinatura para tratar diferentes formatos de data
+        data_assinatura = parse_data_assinatura(data_assinatura_str)
+
+        if data_assinatura is None:
+            print(f"Erro: Data inválida no documento {id_doc} - {data_assinatura_str}")
+            raise ValueError(f"Erro: Data inválida no documento {id_doc} - {data_assinatura_str}")
+
+        # Filtra apenas documentos assinados nos últimos 2 meses
+        if data_assinatura < periodo:
+            continue  # Ignora documentos antigos
+
+        # Remove acentos dos campos a serem comparados
+        documento_normalizado = documento.translate(accent_map)
+        tipo_normalizado = tipo.translate(accent_map)
+        
+        #verifica se o padrão regex está presente no texto
+        for pattern in interest_patterns:
+            if pattern.search(tipo_normalizado) or pattern.search(documento_normalizado):
+                found_types.append({
+                    "id_doc": int(id_doc),
+                    "dt_assinatura": data_assinatura_str,
+                    "nome": documento,
+                    "tipo": tipo
+                })
+
+        # Padrão para "petição" sem acentos
+        if re.search(r"\bpeticao\b", documento_normalizado, re.IGNORECASE) or \
+           re.search(r"\bpeticao\b", tipo_normalizado, re.IGNORECASE):
+            peticao_docs.append({
+                "id_doc": int(id_doc),
+                "dt_assinatura": data_assinatura_str,
+                "nome": documento,
+                "tipo": tipo
+            })
+
+        """
+        for interesse in interests:
+            if interesse.lower() in tipo.lower() or interesse.lower() in documento.lower():
+                # Modificado Nathanael 09/2024
+                found_types.append({
+                    "id_doc": int(id_doc),
+                    "dt_assinatura": data_assinatura_str,
+                    "nome": documento,
+                    "tipo": tipo
+                })
+        
+
+        # Sempre inclui petições, mas agora só se forem recentes
+        if "petição" in documento.lower() or "petição" in tipo.lower():
+            peticao_docs.append({
+                "id_doc": int(id_doc),
+                "dt_assinatura": data_assinatura_str,
+                "nome": documento,
+                "tipo": tipo
+            })
+        """
+
+    # Caso tenha encontrado algum documento que atende os criterios
+    if found_types:
+        return found_types 
+
+    return []  # Retorna lista vazia se nenhum documento atender aos critérios
+
+
+#Faz o tratamento correto das datas
+def parse_data_assinatura(data_assinatura_str):
+    """Tenta converter a string de data para um objeto datetime em vários formatos possíveis."""
+    
+    # Normaliza a string para remover quebras de linha e espaços desnecessários
+    data_assinatura_str = " ".join(data_assinatura_str.split()).strip()
+    
+    # Define os formatos aceitos, incluindo data e hora
+    formatos_aceitos = [
+        "%d/%m/%Y %H:%M",  # Formato completo: 20/07/2023 13:53
+        "%d/%m/%Y",         # Apenas data: 20/07/2023
+        "%Y-%m-%d %H:%M",   # Formato ISO com hora: 2023-07-20 13:53
+        "%Y-%m-%d",         # Formato ISO só data: 2023-07-20
+        "%d-%m-%Y %H:%M",   # Alternativa com traços: 20-07-2023 13:53
+        "%d-%m-%Y",         # Data apenas com traços: 20-07-2023
+    ]
+    
+    for formato in formatos_aceitos:
+        try:
+            return datetime.strptime(data_assinatura_str, formato)
+        except ValueError:
+            continue
+    
+    print(f"Aviso: Data e hora em formato desconhecido: {data_assinatura_str}")
+    return None
+
 
 #Retorna uma lista com as informações de documentos que casam com os tipos de interesse (interests)
-def CheckTypesOfInterest(document_info, interests, forca_peticao):
+def CheckTypesOfInterest_old(document_info, interests, forca_peticao):
     found_types = []
     peticao_docs = []
 
@@ -103,6 +285,7 @@ def CheckTypesOfInterest(document_info, interests, forca_peticao):
                     "tipo": tipo
                 })
 
+            #Sempre inclui petições. Vale a pena manter assim? (Leo)
             if "petição" in documento.lower() or "petição" in tipo.lower():
                 peticao_docs.append({
                     "id_doc": int(id_doc),
@@ -120,13 +303,6 @@ def CheckTypesOfInterest(document_info, interests, forca_peticao):
     #return {"found_types": found_types, "peticao_docs": peticao_docs}
 
 
-def CheckPdfInFolder(document_info, interests, forca_peticao):
-    tipos_encontrados = CheckTypesOfInterest(document_info, interests, forca_peticao)
-    if not tipos_encontrados:
-        print("Nenhum tipo de interesse encontrado no documento fornecido.")
-        
-    return tipos_encontrados
-
 
 def check_pdf_in_folder(folder_path, interests,forca_peticao):
     tipos_encontrados = check_document_types(folder_path, interests,forca_peticao)
@@ -136,6 +312,7 @@ def check_pdf_in_folder(folder_path, interests,forca_peticao):
     return tipos_encontrados
 
 
+#Verifica algumas expressões que caracterizam uma petição
 def search_by_expression(pdf_path):
     # Abre o arquivo PDF
     with open(pdf_path, 'rb') as pdf_file:
@@ -162,8 +339,7 @@ def search_by_expression(pdf_path):
     return None
 
 
-
-
+#Seleciona o id do último documento que segue os critérios de interesse
 def select_id_to_analyze(tipos_encontrados, analysed_ids):
     lista_selecao = [item for item in tipos_encontrados if item not in analysed_ids]
     if not lista_selecao:
@@ -171,10 +347,9 @@ def select_id_to_analyze(tipos_encontrados, analysed_ids):
     documento_selecionado = lista_selecao[0]
     
     if not all(key in documento_selecionado for key in ["id_doc", "nome", "tipo"]):
-        return None
+        raise RuntimeError(f"Campos incompletos para o documento: {documento_selecionado}")
     
-    
-    
+
     id_selecionado = documento_selecionado["id_doc"]
     documento = documento_selecionado["nome"]
     tipo = documento_selecionado["tipo"]
@@ -268,31 +443,3 @@ def CheckPDFDocument(pdf_path, id_selecionado, tipo, documento, tipos_encontrado
                 return CheckPDFDocument(pdf_path, id_selecionado, tipo, documento, tipos_encontrados, contagem_peticoes, analysed_ids)
 
     return id_selecionado
-
-
-
-
-def CheckIdOfInterest(pdf_path,document_info,interests,forca_peticao):
-    # Inicializa varávais para checar se o documento correto é realmente o selecionado
-    # pelo robô
-    contagem_peticoes = 0
-    analysed_ids = []
-    # Captura os andamentos interesse para a aplicação de portaria
-    # dado a lista de andamentos do processo
-    tipos_encontrados = CheckPdfInFolder(document_info, interests,forca_peticao)
-    
-    #print(tipos_encontrados)
-    # Seleciona o último ID de interesse para a análise de Aplicação 
-    # da portaaria  01/2017
-   
-    selecao = select_id_to_analyze(tipos_encontrados,analysed_ids)
-    
-    if selecao is not None:
-        id_selecionado,documento,tipo = selecao 
-        # Faz uma série de Checagens para validar que o documento selecionado é realmente o que o Robô
-        # necessita analisar
-        id_revisto =  CheckPDFDocument(pdf_path,id_selecionado,tipo,documento,tipos_encontrados,contagem_peticoes,analysed_ids)
-        print(f"Id Documento Selecionado: {id_revisto}")
-        return id_revisto
-    else:
-        return None

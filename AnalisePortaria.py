@@ -112,41 +112,36 @@ def inicializa_dicionario():
 #Os tipos de documento possíveis são: "Petição Inicial", "Decisão Interlocutória" (interlocutória), "Sentença" e "Indeterminado"
 def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True, TipoDocumento="Indeterminado", Resumo=True):
     
-    # Verifica se a entrada é um objeto do tipo FileStorage (ou seja, um arquivo) ou um caminho
+    # Verifica se a entrada é um arquivo (FileStorage) ou um caminho existente
     if isinstance(entrada, FileStorage):
                
-        # Verifica se o arquivo está vazio
-      #  if entrada.content_length == 0:
-      #      raise ValueError("O arquivo enviado está vazio.")
-        
-        # Define uma pasta local específica onde os arquivos serão salvos
-        pasta_destino = os.path.join(os.getcwd(), 'temp')
+        # Define uma pasta temporária apropriada
+        pasta_destino = "/tmp"  # Diretório seguro para arquivos temporários
         
         if not os.path.exists(pasta_destino):
-            os.makedirs(pasta_destino)
+            os.makedirs(pasta_destino, exist_ok=True)
         
-        # Cria um nome de arquivo específico, por exemplo, usando o ID do documento ou um timestamp
-        nome_arquivo =  pdf_filename  
-                
-        # Monta o caminho completo para o arquivo na pasta de destino
-        caminho_arquivo = os.path.join(pasta_destino, nome_arquivo)
-        
-        # Salva o arquivo no diretório local específico
-        #entrada.save(caminho_arquivo)
-        
+        # Define o caminho final do arquivo
+        caminho_arquivo = os.path.join(pasta_destino, pdf_filename)
+
+        # Salva o arquivo
+        entrada.save(caminho_arquivo)
+
+        # Verifica se o arquivo foi salvo corretamente
+        if os.path.exists(caminho_arquivo) and os.path.getsize(caminho_arquivo) == 0:
+            raise ValueError("O arquivo salvo está vazio.")
+
         caminho = caminho_arquivo
     else:
         # A entrada já é um caminho para o arquivo
         caminho = entrada
-    
-    
     
     if Verbose:
         print("Modo verbose ativado.")    
         if MedRobot:
             print("MedRobot está ativado.")
     
-    #realiza o preprocessamento e filtragem das paginas do pdf
+    # Realiza o preprocessamento e filtragem das páginas do PDF
     (filtered_pages, tipo_documento, custoresumo) = preprocessamento(caminho, models, Verbose=Verbose, TipoDocumento=TipoDocumento, Resumo=Resumo)        
     
     if tipo_documento == "Indeterminado":
@@ -157,60 +152,35 @@ def AnalisePortaria(entrada, models, pdf_filename, Verbose=False, MedRobot=True,
             print(f"Número de páginas após pré-processamento: {len(filtered_pages)}\n")
             print(f"Tipo de Documento em Análise: {tipo_documento}\n")
 
-        print(f"Número de páginas após pré-processamento: {len(filtered_pages)}\n")
-        print(f"Tipo de Documento em Análise: {tipo_documento}\n")
-
-        # cria ids para as páginas, o que vai ser útil para gerenciar o banco de dados de vetores
+        # Garante que IDs das páginas são strings para compatibilidade com ChromaDB
         ids = [str(i) for i in range(1, len(filtered_pages) + 1)]
 
-        #utiliza embeddings da OpenAI para o banco de vetores Chroma
+        # Inicializa embeddings da OpenAI
         embeddings = OpenAIEmbeddings()
-        
-        
-        docsearch = Chroma.from_documents(filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024}) #a opção "hnsw:M": 1024 é importante para não ter problemas
-        
-        
-        
-        """
-        
-        # Simula o comportamento do docsearch com uma única página (foi necessaria apos mudanca da logica de varias paginas para um unico resumo)
-        class SimpleDocSearch:
-            def __init__(self, documents):
-                self.documents = documents
 
-            def similarity_search(self, query, k=1):
-                # Retorna a única página, pois há apenas um resumo
-                return self.documents[:k]
-            
-            def as_retriever(self):
-                return self
-            
-            def with_config(self, **kwargs):
-                return self
-        """
+        # Cria índice no ChromaDB para busca vetorial
+        docsearch = Chroma.from_documents(
+            filtered_pages, embeddings, ids=ids, collection_metadata={"hnsw:M": 1024}
+        )
         
-        # Cria a instância do "docsearch" com a única página do resumo
-        #docsearch = SimpleDocSearch(filtered_pages)
-        
-        #aplica o pipeline de análise apropriado ao tipo de documento
-        resposta = AnalisePipeline(filtered_pages, docsearch, models, Verbose, MedRobot, TipoDocumento=tipo_documento, Resumo=Resumo, CustoResumo=custoresumo)
+        # Aplica o pipeline de análise apropriado
+        resposta = AnalisePipeline(
+            filtered_pages, docsearch, models, Verbose, MedRobot, TipoDocumento=tipo_documento, Resumo=Resumo, CustoResumo=custoresumo
+        )
     
-        #apaga as entradas criadas no Chroma
-        docsearch._collection.delete(ids=ids)
+        # Apaga os IDs criados no ChromaDB, se existirem
+        if docsearch and hasattr(docsearch, "_collection"):
+            docsearch._collection.delete(ids=ids)
         
-        docsearch = None 
-        #ids = [] 
-
         return resposta
     
     except IndexError:
-        print(f"Erro: Você tentou acessar um índice inválido ao analisar o arquivo {caminho.split()[-1]}.")
+        print(f"Erro: Índice inválido ao analisar o arquivo {os.path.basename(caminho)}.")
         return {"error": "Você tentou acessar um índice inválido ao analisar o arquivo"}
         
     except Exception as e:
-        print(f"Erro ao processar o arquivo {caminho.split()[-1]}: {e}")
-        return {"error": f"Erro ao processar o arquivo {caminho.split()[-1]}: {e}"}
-
+        print(f"Erro ao processar o arquivo {os.path.basename(caminho)}: {e}")
+        return {"error": f"Erro ao processar o arquivo {os.path.basename(caminho)}: {e}"}
 
 
 # Realiza o passo a passo da análise necessária para elaborar o relatório e recomendar ou não a aplicação da portaria

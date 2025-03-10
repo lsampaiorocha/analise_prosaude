@@ -67,6 +67,7 @@ RUN apt-get update && apt-get install -y \
 # Copia os arquivos do projeto para o contêiner
 COPY . .
 
+
 # Instala as dependências do projeto
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -74,4 +75,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 5000
 
 # Comando para iniciar o aplicativo
-CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "--timeout", "600", "runServer:app"]
+#CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "--timeout", "14400", "runServer:app"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "--timeout", "14400", "--log-level", "debug", "--access-logfile", "-", "--error-logfile", "-", "runServer:app"]

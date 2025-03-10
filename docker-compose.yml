@@ -2,12 +2,60 @@ version: "3.8"
 
 services:
   analise_prosaude:
+    container_name: ms-analise-de-portaria-e-elaboracao-de-despachos
+    hostname: analise_prosaude
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "5000:5000"
+      - "5006:5000"
+    env_file: ".env"
     volumes:
       - .:/app
     environment:
       - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1  # Garante que os logs sejam enviados em tempo real
+    command: >
+      gunicorn -w 4 -b 0.0.0.0:5000 
+      --timeout 14400 
+      --log-level debug 
+      --access-logfile - 
+      --error-logfile - 
+      runServer:app
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+
+  scheduler_prosaude:
+    container_name: scheduler-analise-de-portaria
+    hostname: scheduler-analise-de-portaria
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: ".env"
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1  # Garante que os logs sejam enviados em tempo real
+    command: ["python", "-u", "app/scheduler.py"]  # -u para log instantâneo
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: always
+
+  init_prosaude:
+    container_name: init-analise-prosaude
+    hostname: init-analise-prosaude
+    image: curlimages/curl:latest
+    depends_on:
+      - analise_prosaude
+    command: >
+      sh -c "sleep 10 && 
+             curl -X POST http://analise_prosaude:5000/ImportarProcessos &&
+             curl -X POST http://analise_prosaude:5000/AnalisarProcessosMarcados"
